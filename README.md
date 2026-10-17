@@ -12,7 +12,8 @@ thresholds (`eval/THRESHOLDS.md`) are fixed before anything is built.
 
 ```
 Git repo (pinned commit)
-  └─ ingestion job ── allowlist (git ls-files, text only) + leakage scan (refuses person identifiers, data files)
+  └─ ingestion job ── allowlist (git ls-files, text only) + leakage scan (refuses data files, secrets, private person identifiers;
+                                                                   redacts URL tokens)
        ├─ unstructured: Markdown/LaTeX sections, notebook Markdown + printed outputs → chunks
        │    (file, line range, date, commit, section) → Vertex AI embeddings
        └─ structured: deviations log rows, result CSVs → typed tables (date, section, change, results seen?)
@@ -48,8 +49,16 @@ Two corpora:
 
 Only text is ingested: Markdown, LaTeX and notebook Markdown from the repository's tracked files. Never ingested:
 images, dataset manifests or label files (the public datasets keep their own licences, which
-ResearchLedger does not restate), notebook outputs, or credentials. Ingestion fails if an image or data file, or a token
-pattern, is found.
+ResearchLedger does not restate), notebook outputs, or credentials.
+
+Leakage scan:
+
+- **Fails** ingestion on an image or data file, or on anything that looks like a real secret (API keys, private
+  keys, cloud credentials, `.env`-style assignments).
+- **Redacts** tokens in URL query parameters (e.g. `accessToken=`, `token=`, `key=`), such as share links to experiment
+  dashboards, which public research documents sometimes contain. Each value is replaced with `[REDACTED]`, and each
+  redaction is logged (file, line, parameter name; never the value). The log is kept with the index, and the
+  redacted value is never produced in an answer.
 
 ## Plan
 
