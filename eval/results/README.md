@@ -20,6 +20,7 @@ heading path. No embeddings yet. Hybrid search with Vertex AI embeddings comes i
 | `retrieval-marin-20261017T101056.json` | first baseline | 29/38 | 36/38 | 37/38 | 0.839 | not yet measured |
 | `retrieval-marin-20261017T101704.json` | one chunk per table row (dropped) | 24/38 | 34/38 | 35/38 | 0.743 | 26/32 |
 | `retrieval-marin-20261017T101906.json` | baseline again, with exact line maps | 29/38 | 36/38 | 37/38 | 0.839 | 31/32 |
+| `retrieval-marin-20261017T195738.json` | same retriever, gold widened (4 ranges; see `eval/CHANGELOG.md`) | 29/38 | 36/38 | 37/38 | 0.839 | 31/32 |
 
 The only miss at 10 is T02 (a table question). Table questions are meant for the SQL agent over parsed tables, not
 for chunk retrieval.
@@ -31,10 +32,12 @@ for chunk retrieval.
 | first baseline | 10/38 | 19/38 | 24/38 | 0.374 | not yet measured | not yet measured |
 | one chunk per table row (dropped) | 9/38 | 21/38 | 24/38 | 0.366 | 24/34 | 25/34 |
 | baseline again, with exact line maps | 10/38 | 19/38 | 24/38 | 0.370 | 24/34 | 30/34 |
+| same retriever, gold widened (60 ranges, 28 items) | 15/38 | 25/38 | 32/38 | 0.509 | 24/34 | 30/34 |
 
-By type at 10 (final run): lookup 8/12, why 5/8, superseded 4/8, claim 4/7, table 3/3.
+By type at 10, before and after widening: lookup 8/12 to 10/12, why 5/8 to 6/8, superseded 4/8 to 7/8, claim 4/7 to
+6/7, table 3/3 to 3/3.
 
-**Reading:** the gap between recall@10 (24/38) and evidence@10 (30/34) means retrieval usually finds the fact, but
+**Reading (before widening):** the gap between recall@10 (24/38) and evidence@10 (30/34) means retrieval usually finds the fact, but
 often in a different document from the one the gold range names. The private record states many facts in several
 places: trackers, handoff notes, status updates, plan versions and notebooks. Two things follow, and both are open:
 
@@ -42,6 +45,14 @@ places: trackers, handoff notes, status updates, plan versions and notebooks. Tw
    that cites another document stating the same fact would count as a miss.
 2. For superseded facts, citing an older document can be genuinely wrong. Preferring current documents over
    archived ones is part of the retrieval agent's job (step 3).
+
+**Resolution (17 Oct 2026, researcher-approved):** gold ranges now aim to list every current passage that states an
+item's fact.
+- **How additions were found:** proposed by plain text search, not by the retriever, then read, narrowed to exact
+  lines and approved one by one. Archived paths were never added. The procedure is in `eval/CHANGELOG.md`.
+- **Effect:** the retriever and index are unchanged, so the rise in recall (24/38 to 32/38 at 10) is purely a change
+  in what counts as a correct location. evidence@k, which does not depend on gold, is identical before and after.
+- **Remaining gap:** 6 private items still miss at 10. On Marin the widening changed no rank.
 
 **Caveat:** the dropped table-row experiment was judged on these same evaluation sets. There is no held-out set, so
 any further tuning against them risks overfitting, and will be reported as such.

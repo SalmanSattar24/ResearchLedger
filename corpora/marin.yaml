@@ -5,3 +5,6 @@ commit: 5e12684
 include:
   - docs/reports/
   - docs/experiments/
+# Nothing in the included paths is archived. (docs/reports/grug-archive.md is a current log of archived
+# experiments, not an archived document.)
+archived: []

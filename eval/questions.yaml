@@ -24,6 +24,7 @@ files:
   HM: docs/reports/hero-mixture-log.md
   GA: docs/reports/grug-archive.md
   DF: docs/experiments/daily-ferry-log.md
+  IX: docs/reports/index.md
 
 items:
 # ---------------------------------------------------------------- lookup
@@ -36,7 +37,7 @@ items:
   type: lookup
   q: Which tokenizer does Marin use, and why?
   must_include: ["Llama 3 tokenizer", "outperformed Llama 2 and NeoX in bits-per-byte"]
-  gold: [{f: E8, lines: [83, 83]}]
+  gold: [{f: E8, lines: [83, 83]}, {f: IX, lines: [68, 68]}]
 - id: L03
   type: lookup
   q: What was the data mix in the first phase (Kestrel) of the 8B run?
@@ -108,7 +109,7 @@ items:
   type: why
   q: Why was FLAN mixed into the microannealing runs?
   must_include: ["high-quality data lacks few-shot-inducing data such as multiple-choice questions", "70% PT / 15% FLAN / 15% HQ gave the best results"]
-  gold: [{f: E8, lines: [283, 290]}]
+  gold: [{f: E8, lines: [283, 290]}, {f: E8, lines: [297, 299]}]
 - id: W05
   type: why
   q: Why did the 32B run switch to the Qwen3 backbone?
@@ -140,7 +141,7 @@ items:
   type: superseded
   q: What data shuffle does Marin use?
   must_include: ["a Feistel-network permutation since the Mantis cooldown", "replaced the affine/LCG permutation p(x) = (a * x + b) % N"]
-  gold: [{f: E32, lines: [422, 426]}]
+  gold: [{f: E32, lines: [422, 426]}, {f: E32, lines: [378, 378]}]
 - id: S03
   type: superseded
   q: Which backbone is Marin 32B?
@@ -184,7 +185,7 @@ items:
   q: "Check: 'a z-loss penalty fixed the training loss creeping up during Marin 8B's deep cooldowns'"
   verdict: supported
   must_include: ["the lm_head was exploding", "z-loss penalty of 1e-4 on the final logits"]
-  gold: [{f: E8, lines: [455, 461]}]
+  gold: [{f: E8, lines: [455, 461]}, {f: E8, lines: [550, 551]}]
 - id: C03
   type: claim
   q: "Check: 'switching the 32B run to the Muon optimizer fixed its loss spikes'"

@@ -22,6 +22,9 @@ class CorpusConfig:
     commit: str
     include: tuple[str, ...] = ()  # path prefixes; empty means the whole tree
     exclude: tuple[str, ...] = ()
+    # Path prefixes the record itself marks as superseded (old plans, archived trackers). They stay in the index,
+    # since history questions need them, but they are not where a current value should be cited from.
+    archived: tuple[str, ...] = ()
 
     @classmethod
     def load(cls, path: str | Path) -> CorpusConfig:
@@ -32,7 +35,11 @@ class CorpusConfig:
             commit=str(raw["commit"]),
             include=tuple(raw.get("include", ())),
             exclude=tuple(raw.get("exclude", ())),
+            archived=tuple(raw.get("archived", ())),
         )
+
+    def is_archived(self, path: str) -> bool:
+        return path.startswith(self.archived)
 
 
 def _git(repo: Path, *args: str) -> bytes:
