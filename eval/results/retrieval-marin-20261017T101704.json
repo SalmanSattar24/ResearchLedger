@@ -1,0 +1,602 @@
+{
+  "corpus": "marin",
+  "commit": "5e12684c85eac9295514a4c8cdbfee0a55ad497c",
+  "retriever": "bm25 (k1=1.5, b=0.75)",
+  "run_at": "2026-10-17T10:17:04+00:00",
+  "overall": {
+    "n": 38,
+    "recall@1": "24/38 (63%)",
+    "recall@3": "32/38 (84%)",
+    "recall@5": "34/38 (89%)",
+    "recall@10": "35/38 (92%)",
+    "mrr@10": 0.743,
+    "evidence@5": "21/32",
+    "evidence@10": "26/32"
+  },
+  "by_type": {
+    "lookup": {
+      "n": 12,
+      "recall@1": "9/12 (75%)",
+      "recall@3": "11/12 (92%)",
+      "recall@5": "12/12 (100%)",
+      "recall@10": "12/12 (100%)",
+      "mrr@10": 0.822,
+      "evidence@5": "8/12",
+      "evidence@10": "11/12"
+    },
+    "why": {
+      "n": 8,
+      "recall@1": "7/8 (88%)",
+      "recall@3": "8/8 (100%)",
+      "recall@5": "8/8 (100%)",
+      "recall@10": "8/8 (100%)",
+      "mrr@10": 0.938,
+      "evidence@5": "5/5",
+      "evidence@10": "5/5"
+    },
+    "superseded": {
+      "n": 8,
+      "recall@1": "3/8 (38%)",
+      "recall@3": "5/8 (62%)",
+      "recall@5": "6/8 (75%)",
+      "recall@10": "7/8 (88%)",
+      "mrr@10": 0.545,
+      "evidence@5": "5/7",
+      "evidence@10": "6/7"
+    },
+    "claim": {
+      "n": 7,
+      "recall@1": "4/7 (57%)",
+      "recall@3": "7/7 (100%)",
+      "recall@5": "7/7 (100%)",
+      "recall@10": "7/7 (100%)",
+      "mrr@10": 0.786,
+      "evidence@5": "2/6",
+      "evidence@10": "3/6"
+    },
+    "table": {
+      "n": 3,
+      "recall@1": "1/3 (33%)",
+      "recall@3": "1/3 (33%)",
+      "recall@5": "1/3 (33%)",
+      "recall@10": "1/3 (33%)",
+      "mrr@10": 0.333,
+      "evidence@5": "1/2",
+      "evidence@10": "1/2"
+    }
+  },
+  "items": [
+    {
+      "id": "L01",
+      "type": "lookup",
+      "first_gold_rank": 1,
+      "evidence_rank": 6,
+      "gold_ranges_covered_at_10": "1/1",
+      "top": [
+        "docs/reports/marin-8b-retro.md:57-62",
+        "docs/reports/marin-32b-retro.md:73-76",
+        "docs/reports/marin-8b-retro.md:149-154",
+        "docs/reports/marin-8b-retro.md:356-358",
+        "docs/reports/marin-8b-retro.md:64-65"
+      ]
+    },
+    {
+      "id": "L02",
+      "type": "lookup",
+      "first_gold_rank": 1,
+      "evidence_rank": 1,
+      "gold_ranges_covered_at_10": "1/1",
+      "top": [
+        "docs/reports/marin-8b-retro.md:81-83",
+        "docs/reports/index.md:63-86",
+        "docs/reports/hero-mixture-log.md:1-10",
+        "docs/reports/marin-8b-retro.md:149-154",
+        "docs/reports/data/README.md:55-58"
+      ]
+    },
+    {
+      "id": "L03",
+      "type": "lookup",
+      "first_gold_rank": 1,
+      "evidence_rank": 6,
+      "gold_ranges_covered_at_10": "1/1",
+      "top": [
+        "docs/reports/marin-8b-retro.md:156-157",
+        "docs/reports/marin-8b-retro.md:149-154",
+        "docs/reports/marin-8b-retro.md:159-159",
+        "docs/reports/marin-8b-retro.md:160-160",
+        "docs/reports/marin-8b-retro.md:316-317"
+      ]
+    },
+    {
+      "id": "L04",
+      "type": "lookup",
+      "first_gold_rank": 3,
+      "evidence_rank": 3,
+      "gold_ranges_covered_at_10": "1/1",
+      "top": [
+        "docs/reports/marin-8b-retro.md:165-183",
+        "docs/reports/marin-8b-retro.md:339-341",
+        "docs/reports/marin-8b-retro.md:185-195",
+        "docs/reports/marin-8b-retro.md:401-404",
+        "docs/reports/marin-8b-retro.md:545-553"
+      ]
+    },
+    {
+      "id": "L05",
+      "type": "lookup",
+      "first_gold_rank": 1,
+      "evidence_rank": 3,
+      "gold_ranges_covered_at_10": "1/1",
+      "top": [
+        "docs/reports/marin-8b-retro.md:349-349",
+        "docs/reports/marin-8b-retro.md:356-358",
+        "docs/reports/marin-8b-retro.md:351-351",
+        "docs/reports/marin-8b-retro.md:350-350",
+        "docs/reports/marin-8b-retro.md:588-589"
+      ]
+    },
+    {
+      "id": "L06",
+      "type": "lookup",
+      "first_gold_rank": 1,
+      "evidence_rank": 1,
+      "gold_ranges_covered_at_10": "1/1",
+      "top": [
+        "docs/reports/marin-32b-retro.md:67-71",
+        "docs/reports/marin-8b-retro.md:97-104",
+        "docs/reports/marin-32b-retro.md:159-163",
+        "docs/reports/marin-8b-retro.md:234-237",
+        "docs/experiments/daily-ferry-log.md:1-12"
+      ]
+    },
+    {
+      "id": "L07",
+      "type": "lookup",
+      "first_gold_rank": 5,
+      "evidence_rank": 5,
+      "gold_ranges_covered_at_10": "1/1",
+      "top": [
+        "docs/reports/marin-8b-retro.md:373-383",
+        "docs/reports/marin-8b-retro.md:85-91",
+        "docs/reports/marin-8b-retro.md:619-622",
+        "docs/reports/marin-32b-retro.md:37-39",
+        "docs/reports/marin-32b-retro.md:48-63"
+      ]
+    },
+    {
+      "id": "L08",
+      "type": "lookup",
+      "first_gold_rank": 3,
+      "evidence_rank": null,
+      "gold_ranges_covered_at_10": "1/1",
+      "top": [
+        "docs/reports/marin-8b-retro.md:401-404",
+        "docs/reports/marin-8b-retro.md:339-341",
+        "docs/reports/marin-32b-retro.md:107-109",
+        "docs/reports/marin-8b-retro.md:545-553",
+        "docs/reports/marin-32b-retro.md:113-113"
+      ]
+    },
+    {
+      "id": "L09",
+      "type": "lookup",
+      "first_gold_rank": 1,
+      "evidence_rank": 8,
+      "gold_ranges_covered_at_10": "2/2",
+      "top": [
+        "docs/reports/marin-32b-retro.md:468-474",
+        "docs/reports/marin-32b-retro.md:463-463",
+        "docs/reports/marin-8b-retro.md:581-585",
+        "docs/reports/marin-32b-retro.md:449-449",
+        "docs/reports/marin-8b-retro.md:658-658"
+      ]
+    },
+    {
+      "id": "L10",
+      "type": "lookup",
+      "first_gold_rank": 1,
+      "evidence_rank": 1,
+      "gold_ranges_covered_at_10": "1/1",
+      "top": [
+        "docs/experiments/daily-ferry-log.md:16-28",
+        "docs/experiments/daily-ferry-log.md:1-12",
+        "docs/reports/marin-8b-retro.md:81-83",
+        "docs/experiments/daily-ferry-log.md:14-14",
+        "docs/reports/marin-8b-retro.md:362-370"
+      ]
+    },
+    {
+      "id": "L11",
+      "type": "lookup",
+      "first_gold_rank": 1,
+      "evidence_rank": 1,
+      "gold_ranges_covered_at_10": "1/1",
+      "top": [
+        "docs/reports/hero-mixture-log.md:1-10",
+        "docs/reports/hero-mixture-log.md:47-48",
+        "docs/reports/hero-mixture-log.md:50-50",
+        "docs/reports/hero-mixture-log.md:54-54",
+        "docs/reports/hero-mixture-log.md:55-55"
+      ]
+    },
+    {
+      "id": "L12",
+      "type": "lookup",
+      "first_gold_rank": 1,
+      "evidence_rank": 1,
+      "gold_ranges_covered_at_10": "1/1",
+      "top": [
+        "docs/reports/marin-8b-retro.md:443-469",
+        "docs/reports/marin-8b-retro.md:472-480",
+        "docs/reports/marin-8b-retro.md:545-553",
+        "docs/reports/agent-moe-experiments.md:173-173",
+        "docs/reports/marin-32b-retro.md:122-122"
+      ]
+    },
+    {
+      "id": "W01",
+      "type": "why",
+      "first_gold_rank": 1,
+      "evidence_rank": "n/a",
+      "gold_ranges_covered_at_10": "1/1",
+      "top": [
+        "docs/reports/marin-8b-retro.md:52-55",
+        "docs/reports/marin-32b-retro.md:102-102",
+        "docs/reports/marin-32b-retro.md:86-86",
+        "docs/reports/marin-8b-retro.md:69-69",
+        "docs/reports/marin-8b-retro.md:351-351"
+      ]
+    },
+    {
+      "id": "W02",
+      "type": "why",
+      "first_gold_rank": 1,
+      "evidence_rank": 1,
+      "gold_ranges_covered_at_10": "2/2",
+      "top": [
+        "docs/reports/marin-8b-retro.md:165-183",
+        "docs/reports/marin-8b-retro.md:207-231",
+        "docs/reports/marin-8b-retro.md:201-201",
+        "docs/reports/marin-8b-retro.md:571-578",
+        "docs/reports/marin-8b-retro.md:156-157"
+      ]
+    },
+    {
+      "id": "W03",
+      "type": "why",
+      "first_gold_rank": 1,
+      "evidence_rank": "n/a",
+      "gold_ranges_covered_at_10": "1/1",
+      "top": [
+        "docs/reports/marin-8b-retro.md:207-231",
+        "docs/reports/marin-8b-retro.md:165-183",
+        "docs/reports/marin-32b-retro.md:266-268",
+        "docs/reports/marin-32b-retro.md:417-438",
+        "docs/reports/marin-32b-retro.md:326-330"
+      ]
+    },
+    {
+      "id": "W04",
+      "type": "why",
+      "first_gold_rank": 1,
+      "evidence_rank": 1,
+      "gold_ranges_covered_at_10": "1/1",
+      "top": [
+        "docs/reports/marin-8b-retro.md:275-303",
+        "docs/reports/marin-8b-retro.md:650-654",
+        "docs/reports/marin-32b-retro.md:400-400",
+        "docs/reports/marin-32b-retro.md:302-302",
+        "docs/reports/marin-8b-retro.md:373-383"
+      ]
+    },
+    {
+      "id": "W05",
+      "type": "why",
+      "first_gold_rank": 2,
+      "evidence_rank": 2,
+      "gold_ranges_covered_at_10": "2/2",
+      "top": [
+        "docs/reports/marin-32b-retro.md:45-45",
+        "docs/reports/marin-32b-retro.md:240-257",
+        "docs/reports/marin-32b-retro.md:1-20",
+        "docs/reports/marin-32b-retro.md:73-76",
+        "docs/reports/marin-32b-retro.md:23-35"
+      ]
+    },
+    {
+      "id": "W06",
+      "type": "why",
+      "first_gold_rank": 1,
+      "evidence_rank": 1,
+      "gold_ranges_covered_at_10": "1/1",
+      "top": [
+        "docs/reports/marin-32b-retro.md:335-351",
+        "docs/reports/marin-32b-retro.md:454-457",
+        "docs/reports/marin-32b-retro.md:278-284",
+        "docs/reports/marin-32b-retro.md:447-447",
+        "docs/reports/marin-32b-retro.md:1-20"
+      ]
+    },
+    {
+      "id": "W07",
+      "type": "why",
+      "first_gold_rank": 1,
+      "evidence_rank": "n/a",
+      "gold_ranges_covered_at_10": "1/1",
+      "top": [
+        "docs/reports/marin-32b-retro.md:353-369",
+        "docs/reports/marin-32b-retro.md:417-438",
+        "docs/reports/marin-32b-retro.md:278-284",
+        "docs/reports/marin-32b-retro.md:1-20",
+        "docs/reports/marin-32b-retro.md:326-330"
+      ]
+    },
+    {
+      "id": "W08",
+      "type": "why",
+      "first_gold_rank": 1,
+      "evidence_rank": 1,
+      "gold_ranges_covered_at_10": "1/1",
+      "top": [
+        "docs/reports/marin-32b-retro.md:240-257",
+        "docs/reports/marin-32b-retro.md:261-261",
+        "docs/reports/marin-32b-retro.md:45-45",
+        "docs/reports/marin-32b-retro.md:259-260",
+        "docs/reports/marin-32b-retro.md:266-268"
+      ]
+    },
+    {
+      "id": "S01",
+      "type": "superseded",
+      "first_gold_rank": 4,
+      "evidence_rank": 10,
+      "gold_ranges_covered_at_10": "3/3",
+      "top": [
+        "docs/reports/marin-8b-retro.md:619-622",
+        "docs/reports/marin-8b-retro.md:52-55",
+        "docs/reports/marin-32b-retro.md:159-163",
+        "docs/reports/marin-8b-retro.md:85-91",
+        "docs/reports/marin-32b-retro.md:153-154"
+      ]
+    },
+    {
+      "id": "S02",
+      "type": "superseded",
+      "first_gold_rank": 9,
+      "evidence_rank": "n/a",
+      "gold_ranges_covered_at_10": "1/1",
+      "top": [
+        "docs/reports/marin-32b-retro.md:353-369",
+        "docs/reports/marin-8b-retro.md:149-154",
+        "docs/reports/data/README.md:55-58",
+        "docs/reports/marin-32b-retro.md:46-46",
+        "docs/reports/hero-mixture-log.md:1-10"
+      ]
+    },
+    {
+      "id": "S03",
+      "type": "superseded",
+      "first_gold_rank": null,
+      "evidence_rank": null,
+      "gold_ranges_covered_at_10": "0/2",
+      "top": [
+        "docs/reports/marin-32b-retro.md:73-76",
+        "docs/reports/marin-32b-retro.md:203-212",
+        "docs/reports/marin-32b-retro.md:23-35",
+        "docs/reports/index.md:41-46",
+        "docs/reports/marin-32b-retro.md:78-78"
+      ]
+    },
+    {
+      "id": "S04",
+      "type": "superseded",
+      "first_gold_rank": 2,
+      "evidence_rank": 2,
+      "gold_ranges_covered_at_10": "2/2",
+      "top": [
+        "docs/reports/marin-32b-retro.md:125-128",
+        "docs/reports/marin-32b-retro.md:186-189",
+        "docs/reports/marin-32b-retro.md:119-119",
+        "docs/reports/marin-32b-retro.md:191-194",
+        "docs/reports/marin-32b-retro.md:120-120"
+      ]
+    },
+    {
+      "id": "S05",
+      "type": "superseded",
+      "first_gold_rank": 2,
+      "evidence_rank": 2,
+      "gold_ranges_covered_at_10": "1/3",
+      "top": [
+        "docs/reports/marin-32b-retro.md:519-526",
+        "docs/reports/marin-32b-retro.md:48-63",
+        "docs/reports/marin-32b-retro.md:23-35",
+        "docs/reports/marin-8b-retro.md:443-469",
+        "docs/reports/marin-8b-retro.md:362-370"
+      ]
+    },
+    {
+      "id": "S06",
+      "type": "superseded",
+      "first_gold_rank": 1,
+      "evidence_rank": 1,
+      "gold_ranges_covered_at_10": "1/1",
+      "top": [
+        "docs/reports/hero-mixture-log.md:1-10",
+        "docs/reports/hero-mixture-log.md:47-48",
+        "docs/reports/hero-mixture-log.md:50-50",
+        "docs/reports/hero-mixture-log.md:54-54",
+        "docs/reports/hero-mixture-log.md:55-55"
+      ]
+    },
+    {
+      "id": "S07",
+      "type": "superseded",
+      "first_gold_rank": 1,
+      "evidence_rank": 1,
+      "gold_ranges_covered_at_10": "1/1",
+      "top": [
+        "docs/reports/grug-archive.md:72-78",
+        "docs/reports/marin-8b-retro.md:603-605",
+        "docs/experiments/daily-ferry-log.md:16-28",
+        "docs/reports/agent-moe-experiments.md:177-177",
+        "docs/reports/marin-8b-retro.md:443-469"
+      ]
+    },
+    {
+      "id": "S08",
+      "type": "superseded",
+      "first_gold_rank": 1,
+      "evidence_rank": 1,
+      "gold_ranges_covered_at_10": "1/1",
+      "top": [
+        "docs/reports/marin-8b-retro.md:240-251",
+        "docs/reports/marin-8b-retro.md:259-262",
+        "docs/reports/marin-8b-retro.md:57-62",
+        "docs/reports/marin-8b-retro.md:149-154",
+        "docs/reports/marin-32b-retro.md:73-76"
+      ]
+    },
+    {
+      "id": "C01",
+      "type": "claim",
+      "first_gold_rank": 2,
+      "evidence_rank": null,
+      "gold_ranges_covered_at_10": "2/2",
+      "top": [
+        "docs/reports/marin-8b-retro.md:356-358",
+        "docs/reports/marin-8b-retro.md:596-601",
+        "docs/reports/marin-8b-retro.md:591-591",
+        "docs/reports/marin-8b-retro.md:660-660",
+        "docs/reports/marin-8b-retro.md:661-661"
+      ]
+    },
+    {
+      "id": "C02",
+      "type": "claim",
+      "first_gold_rank": 1,
+      "evidence_rank": 1,
+      "gold_ranges_covered_at_10": "1/1",
+      "top": [
+        "docs/reports/marin-8b-retro.md:443-469",
+        "docs/reports/marin-32b-retro.md:528-536",
+        "docs/reports/marin-8b-retro.md:545-553",
+        "docs/reports/marin-8b-retro.md:669-676",
+        "docs/reports/marin-8b-retro.md:472-480"
+      ]
+    },
+    {
+      "id": "C03",
+      "type": "claim",
+      "first_gold_rank": 2,
+      "evidence_rank": "n/a",
+      "gold_ranges_covered_at_10": "1/1",
+      "top": [
+        "docs/reports/marin-32b-retro.md:125-128",
+        "docs/reports/marin-32b-retro.md:220-238",
+        "docs/reports/marin-32b-retro.md:191-194",
+        "docs/reports/agent-moe-experiments.md:108-108",
+        "docs/reports/marin-32b-retro.md:214-218"
+      ]
+    },
+    {
+      "id": "C04",
+      "type": "claim",
+      "first_gold_rank": 2,
+      "evidence_rank": 9,
+      "gold_ranges_covered_at_10": "1/1",
+      "top": [
+        "docs/reports/marin-32b-retro.md:454-457",
+        "docs/reports/marin-32b-retro.md:468-474",
+        "docs/reports/marin-32b-retro.md:476-488",
+        "docs/reports/marin-32b-retro.md:462-462",
+        "docs/reports/marin-32b-retro.md:490-498"
+      ]
+    },
+    {
+      "id": "C05",
+      "type": "claim",
+      "first_gold_rank": 1,
+      "evidence_rank": null,
+      "gold_ranges_covered_at_10": "1/3",
+      "top": [
+        "docs/reports/marin-8b-retro.md:240-251",
+        "docs/reports/marin-8b-retro.md:472-480",
+        "docs/reports/marin-8b-retro.md:234-237",
+        "docs/reports/marin-8b-retro.md:545-553",
+        "docs/reports/marin-8b-retro.md:257-257"
+      ]
+    },
+    {
+      "id": "C06",
+      "type": "claim",
+      "first_gold_rank": 1,
+      "evidence_rank": 1,
+      "gold_ranges_covered_at_10": "1/1",
+      "top": [
+        "docs/reports/marin-32b-retro.md:335-351",
+        "docs/reports/marin-8b-retro.md:351-351",
+        "docs/reports/marin-32b-retro.md:511-517",
+        "docs/reports/marin-8b-retro.md:624-639",
+        "docs/reports/marin-32b-retro.md:23-35"
+      ]
+    },
+    {
+      "id": "C07",
+      "type": "claim",
+      "first_gold_rank": 1,
+      "evidence_rank": null,
+      "gold_ranges_covered_at_10": "1/1",
+      "top": [
+        "docs/reports/marin-8b-retro.md:373-383",
+        "docs/reports/marin-8b-retro.md:1-23",
+        "docs/reports/marin-8b-retro.md:556-560",
+        "docs/reports/marin-8b-retro.md:679-686",
+        "docs/reports/marin-8b-retro.md:275-303"
+      ]
+    },
+    {
+      "id": "T01",
+      "type": "table",
+      "first_gold_rank": 1,
+      "evidence_rank": "n/a",
+      "gold_ranges_covered_at_10": "1/1",
+      "top": [
+        "docs/reports/marin-8b-retro.md:504-504",
+        "docs/reports/marin-8b-retro.md:507-507",
+        "docs/reports/marin-32b-retro.md:312-313",
+        "docs/reports/marin-8b-retro.md:482-488",
+        "docs/reports/marin-8b-retro.md:510-510"
+      ]
+    },
+    {
+      "id": "T02",
+      "type": "table",
+      "first_gold_rank": null,
+      "evidence_rank": 1,
+      "gold_ranges_covered_at_10": "0/1",
+      "top": [
+        "docs/reports/marin-32b-retro.md:371-381",
+        "docs/reports/marin-32b-retro.md:286-288",
+        "docs/reports/marin-32b-retro.md:290-291",
+        "docs/reports/marin-32b-retro.md:305-305",
+        "docs/reports/marin-32b-retro.md:300-300"
+      ]
+    },
+    {
+      "id": "T03",
+      "type": "table",
+      "first_gold_rank": null,
+      "evidence_rank": null,
+      "gold_ranges_covered_at_10": "0/1",
+      "top": [
+        "docs/reports/marin-32b-retro.md:490-498",
+        "docs/reports/marin-32b-retro.md:468-474",
+        "docs/reports/marin-32b-retro.md:454-457",
+        "docs/reports/marin-8b-retro.md:596-601",
+        "docs/reports/marin-32b-retro.md:462-462"
+      ]
+    }
+  ]
+}

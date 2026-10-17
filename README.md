@@ -5,8 +5,9 @@ log, deviations log, protocol, notebooks, result tables) with citations to the e
 track of facts that were later superseded, and checks whether a claim (in a CV, abstract or draft) is backed by the
 record.
 
-Status: **design and evaluation method (17 Oct 2026); no code yet.** Each corpus's evaluation set and the pass
-thresholds (`eval/THRESHOLDS.md`) are fixed before anything is built.
+Status (17 Oct 2026): **step 2, local ingestion and keyword retrieval, is built and measured; no agents yet.**
+Each corpus's evaluation set and the pass thresholds (`eval/THRESHOLDS.md`) were fixed before any code was written.
+Retrieval results so far: [`eval/results/`](eval/results/README.md).
 
 ## Design
 
@@ -14,9 +15,9 @@ thresholds (`eval/THRESHOLDS.md`) are fixed before anything is built.
 Git repo (pinned commit)
   └─ ingestion job ── allowlist (git ls-files, text only) + leakage scan (refuses data files, secrets, private person identifiers;
                                                                    redacts URL tokens)
-       ├─ unstructured: Markdown/LaTeX sections, notebook Markdown + printed outputs → chunks
+       ├─ unstructured: Markdown/LaTeX sections, notebook Markdown cells (never outputs) → chunks
        │    (file, line range, date, commit, section) → Vertex AI embeddings
-       └─ structured: deviations log rows, result CSVs → typed tables (date, section, change, results seen?)
+       └─ structured: Markdown tables (e.g. deviations log, result tables) → typed cells (row, column, number)
                          ▼
                   BigQuery (chunks + embeddings, tables; VECTOR_SEARCH + keyword search)
                          ▼
@@ -59,6 +60,19 @@ Leakage scan:
   dashboards, which public research documents sometimes contain. Each value is replaced with `[REDACTED]`, and each
   redaction is logged (file, line, parameter name; never the value). The log is kept with the index, and the
   redacted value is never produced in an answer.
+
+## Running locally (step 2)
+
+```bash
+python -m pip install -e ".[dev]"
+python -m pytest
+python -m researchledger ingest --corpus corpora/marin.yaml --index .cache/index/marin.sqlite
+python -m researchledger search --index .cache/index/marin.sqlite "Why did the 32B run switch to QK-Norm?"
+python -m researchledger eval-retrieval --index .cache/index/marin.sqlite --questions eval/questions.yaml --out eval/results
+```
+
+Ingestion reads the pinned commit from git objects (a blobless clone into `.cache/` for a remote corpus), so the
+source working tree is never read or changed. The index is SQLite locally; BigQuery replaces it in step 4.
 
 ## Plan
 
