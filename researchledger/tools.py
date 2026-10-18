@@ -10,7 +10,7 @@ import re
 import sqlite3
 from pathlib import Path
 
-from .retrieve import BM25Index
+from .retrieve import BM25Index  # noqa: F401 (re-exported for callers)
 
 MAX_TEXT = 600  # characters of chunk text returned by search
 MAX_LINES = 40  # lines returned by one read_lines call
@@ -49,9 +49,11 @@ def _fit(query: str, rows: list[tuple[int, str]], limit: int = MAX_TEXT) -> str:
 
 
 class LedgerIndex:
-    def __init__(self, index_path: str | Path):
+    def __init__(self, index_path: str | Path, retriever: str | None = None, embed=None):
+        from .embed import open_retriever
+
         self.path = Path(index_path)
-        self.bm25 = BM25Index(self.path)
+        self.retriever = open_retriever(self.path, retriever, embed)
         self.db = sqlite3.connect(f"file:{self.path.as_posix()}?mode=ro", uri=True, check_same_thread=False)
         self.db.execute("PRAGMA query_only = ON")
         self.archived = {p for (p,) in self.db.execute("SELECT path FROM documents WHERE archived = 1")}
@@ -61,7 +63,7 @@ class LedgerIndex:
     def search(self, query: str, k: int = 5) -> list[dict]:
         """Chunks whose non-blank lines are each prefixed with their line number, so citations can be exact."""
         out = []
-        for h in self.bm25.search(query, k=max(1, min(k, 10))):
+        for h in self.retriever.search(query, k=max(1, min(k, 10))):
             rows = self.db.execute(
                 "SELECT line, text FROM doc_lines WHERE path = ? AND line BETWEEN ? AND ? ORDER BY line",
                 (h.path, h.start_line, h.end_line),

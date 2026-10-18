@@ -48,7 +48,7 @@ def overlaps(hit: Hit, path: str, start: int, end: int) -> bool:
     return hit.path == path and hit.start_line <= end and hit.end_line >= start
 
 
-def evaluate_retrieval(index_path: str | Path, questions_path: str | Path) -> dict:
+def evaluate_retrieval(index_path: str | Path, questions_path: str | Path, retriever: str = "bm25") -> dict:
     qs = yaml.safe_load(Path(questions_path).read_text(encoding="utf-8"))
     db = sqlite3.connect(index_path)
     name, commit = db.execute("SELECT name, commit_sha FROM corpus").fetchone()
@@ -57,7 +57,9 @@ def evaluate_retrieval(index_path: str | Path, questions_path: str | Path) -> di
     if not commit.startswith(pinned):
         raise ValueError(f"index is at {commit[:12]} but the evaluation set is pinned to {pinned}")
 
-    index = BM25Index(index_path)
+    from .embed import RRF_K, open_retriever
+
+    index = open_retriever(index_path, retriever)
     items = []
     for it in qs["items"]:
         if it["type"] == "safety":
@@ -95,7 +97,8 @@ def evaluate_retrieval(index_path: str | Path, questions_path: str | Path) -> di
     return {
         "corpus": name,
         "commit": commit,
-        "retriever": "bm25 (k1=1.5, b=0.75)",
+        "retriever": ("bm25 (k1=1.5, b=0.75)" if retriever == "bm25" else
+                      f"hybrid: bm25 + {index.model} vectors, reciprocal rank fusion (k={RRF_K})"),
         "run_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "overall": summarize(items),
         "by_type": {t: summarize(v) for t, v in by_type.items()},
@@ -108,7 +111,8 @@ def write_results(results: dict, out_dir: str | Path, aggregate_only: bool = Fal
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     stamp = results["run_at"].replace(":", "").replace("-", "")[:15]
-    path = out_dir / f"retrieval-{results['corpus']}-{stamp}.json"
+    tag = "" if results["retriever"].startswith("bm25") else "-hybrid"
+    path = out_dir / f"retrieval-{results['corpus']}{tag}-{stamp}.json"
     payload = {k: v for k, v in results.items() if not (aggregate_only and k == "items")}
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     return path

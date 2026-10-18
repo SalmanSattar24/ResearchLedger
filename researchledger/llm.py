@@ -31,12 +31,18 @@ PRICES = {
 def _retry():
     from google.genai import types
 
-    # Shared Gemini capacity returns 429 under bursts; back off and retry. Waits count toward measured latency.
+    # Shared Gemini capacity returns 429 under bursts, and 504 when a request passes its timeout; back off and retry. Waits count toward measured latency.
     return types.HttpRetryOptions(attempts=6, initial_delay=2.0, max_delay=60.0, exp_base=2.0, jitter=1.0,
-                                  http_status_codes=[429, 500, 503])
+                                  http_status_codes=[429, 500, 503, 504])
 
 
 RETRY = _retry()
+
+# Per-request timeout. Most calls take 2-6 s, but on shared capacity a call occasionally hangs for 25-50 s; a timeout
+# is retried (with RETRY), which is faster than waiting. The coordinator writes the longest output, so it gets more.
+CALL_TIMEOUT_MS = {"coordinator": 25_000, "retrieval_agent": 15_000, "sql_agent": 15_000, "verifier": 15_000}
+# Tool calls allowed per sub-agent per question; past that a tool returns an error asking for the findings so far.
+TOOL_BUDGET = {"retrieval_agent": 3, "sql_agent": 4}
 
 
 def configure_vertex() -> None:
@@ -77,6 +83,7 @@ class Usage:
 
     calls: list[ModelCall] = field(default_factory=list)
     _started: dict[str, float] = field(default_factory=dict)
+    tool_calls: dict[str, int] = field(default_factory=dict)  # per agent, in the current attempt (TOOL_BUDGET)
 
     def start(self, agent: str) -> None:
         self._started[agent] = time.perf_counter()

@@ -20,7 +20,7 @@ from dataclasses import dataclass
 
 from .llm import AGENT_MODEL, Usage, configure_vertex, genai_client
 from .tools import LedgerIndex
-from .verify import Answer, check_deterministic, check_support, parse_answer
+from .verify import Answer, attach_sql, check_deterministic, check_support, parse_answer
 
 RETRIEVAL_INSTRUCTION = """You find evidence in a research project's record. Use the tools; never answer from memory.
 
@@ -105,7 +105,7 @@ class Result:
     trace: list[dict]  # per attempt: the coordinator's answer (or raw text) and the verifier's problems
 
 
-def _build(index: LedgerIndex, usage: Usage):
+def _build(index: LedgerIndex, usage: Usage, ran_sql: list[str]):
     from google.adk.agents import LlmAgent
     from google.adk.tools import AgentTool
     from google.genai import types
@@ -130,22 +130,39 @@ def _build(index: LedgerIndex, usage: Usage):
 
     def run_sql(query: str) -> dict:
         """Run one read-only SELECT over tables(...) and table_cells(...). Returns columns and rows."""
-        return index.run_sql(query)
+        res = index.run_sql(query)
+        if "error" not in res:
+            ran_sql.append(query)
+        return res
 
-    cfg = types.GenerateContentConfig(temperature=0, thinking_config=types.ThinkingConfig(thinking_level="low"))
     from google.adk.models import Gemini
 
-    from .llm import RETRY
+    from .llm import CALL_TIMEOUT_MS, RETRY, TOOL_BUDGET
+
+    def cfg(agent: str):
+        return types.GenerateContentConfig(temperature=0, thinking_config=types.ThinkingConfig(thinking_level="low"),
+                                           http_options=types.HttpOptions(timeout=CALL_TIMEOUT_MS[agent]))
+
+    def budget(tool, args, tool_context):
+        """Stop a sub-agent's ReAct loop after TOOL_BUDGET calls per attempt (a returned dict replaces the tool's
+        result)."""
+        agent = tool_context.agent_name
+        usage.tool_calls[agent] = usage.tool_calls.get(agent, 0) + 1
+        if usage.tool_calls[agent] > TOOL_BUDGET.get(agent, 99):
+            return {"error": "tool budget used up: reply now with the findings you have"}
+        return None
 
     model = Gemini(model=AGENT_MODEL, retry_options=RETRY)
-    common = dict(model=model, generate_content_config=cfg,
-                  before_model_callback=before, after_model_callback=after)
+    common = dict(model=model, before_model_callback=before, after_model_callback=after)
     retrieval = LlmAgent(name="retrieval_agent", description="Finds passages and exact lines in the record.",
-                         instruction=RETRIEVAL_INSTRUCTION, tools=[search, read_lines], **common)
+                         instruction=RETRIEVAL_INSTRUCTION, tools=[search, read_lines],
+                         generate_content_config=cfg("retrieval_agent"), before_tool_callback=budget, **common)
     sql = LlmAgent(name="sql_agent", description="Answers counting and comparison questions over parsed tables.",
-                   instruction=SQL_INSTRUCTION, tools=[list_tables, run_sql], **common)
+                   instruction=SQL_INSTRUCTION, tools=[list_tables, run_sql],
+                   generate_content_config=cfg("sql_agent"), before_tool_callback=budget, **common)
     return LlmAgent(name="coordinator", description="Answers questions about the record with citations.",
-                    instruction=COORDINATOR_INSTRUCTION, tools=[AgentTool(retrieval), AgentTool(sql)], **common)
+                    instruction=COORDINATOR_INSTRUCTION, tools=[AgentTool(retrieval), AgentTool(sql)],
+                    generate_content_config=cfg("coordinator"), **common)
 
 
 async def _ask_async(index: LedgerIndex, question: str, client) -> Result:
@@ -153,7 +170,8 @@ async def _ask_async(index: LedgerIndex, question: str, client) -> Result:
     from google.genai import types
 
     usage = Usage()
-    runner = InMemoryRunner(agent=_build(index, usage), app_name="researchledger")
+    ran_sql: list[str] = []  # successful queries sql_agent ran for this question
+    runner = InMemoryRunner(agent=_build(index, usage, ran_sql), app_name="researchledger")
     session = await runner.session_service.create_session(app_name="researchledger", user_id="eval",
                                                           session_id=uuid.uuid4().hex)
     t0 = time.perf_counter()
@@ -172,13 +190,15 @@ async def _ask_async(index: LedgerIndex, question: str, client) -> Result:
     attempts = 0
     trace: list[dict] = []
     for attempts in (1, 2):
+        usage.tool_calls.clear()
         raw = await turn(message)
         try:
             answer = parse_answer(raw)
+            notes = attach_sql(answer, index, ran_sql)
             problems = check_deterministic(answer, index)
             if not problems:
                 problems = check_support(answer, index, client, AGENT_MODEL, usage)
-            trace.append({"answer": answer.model_dump(), "problems": problems})
+            trace.append({"answer": answer.model_dump(), "problems": problems, "notes": notes})
         except ValueError as e:
             answer, problems = None, [str(e)]
             trace.append({"raw": raw[:2000], "problems": problems})

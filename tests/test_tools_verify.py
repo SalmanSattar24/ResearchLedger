@@ -3,7 +3,7 @@ import pytest
 from researchledger.corpus import CorpusConfig
 from researchledger.ingest import ingest
 from researchledger.tools import LedgerIndex
-from researchledger.verify import Answer, Citation, Claim, check_deterministic, parse_answer
+from researchledger.verify import Answer, Citation, Claim, attach_sql, check_deterministic, parse_answer
 from test_ingest_retrieve import make_repo
 
 DOCS = {
@@ -77,6 +77,20 @@ def test_computed_claim_is_rechecked_by_running_its_sql(index):
     wrong = check_deterministic(_answer(Claim(text="3 datasets have a share above 20%.", citations=rows, sql=sql)),
                                 index)
     assert any("the number 3 is not in its cited lines or its SQL result" in p for p in wrong)
+    listing = "SELECT text FROM table_cells WHERE col_name = 'Share' AND num > 20"  # 2 rows: the count is evidence
+    assert check_deterministic(_answer(Claim(text="2 datasets have a share above 20%.", citations=rows,
+                                             sql=listing)), index) == []
+
+
+def test_a_computed_claim_without_its_query_gets_the_query_that_was_run(index):
+    rows = [Citation(path="docs/run-8b.md", start=7, end=9)]
+    ran = ["SELECT count(*) FROM table_cells WHERE col_name = 'Share' AND num > 50",  # result 1: no match
+           "SELECT count(*) FROM table_cells WHERE col_name = 'Share' AND num > 20"]  # result 2
+    a = _answer(Claim(text="2 datasets have a share above 20%.", citations=rows))
+    assert attach_sql(a, index, ran) and a.claims[0].sql == ran[1]
+    assert check_deterministic(a, index) == []
+    wrong = _answer(Claim(text="3 datasets have a share above 20%.", citations=rows))
+    assert attach_sql(wrong, index, ran) == [] and wrong.claims[0].sql is None
 
 
 def test_refusal_must_not_carry_claims_or_leak(index):
