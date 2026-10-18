@@ -6,3 +6,5 @@ __pycache__/
 eval/results/*.tmp
 .terraform/
 *.tfstate*
+.cache/
+.pytest_cache/

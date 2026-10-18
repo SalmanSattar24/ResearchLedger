@@ -1,0 +1,10 @@
+# Public demo corpus. Licence: Apache-2.0 (read from the repository's LICENSE file, 17 Oct 2026).
+name: marin
+source: https://github.com/marin-community/marin.git
+commit: 5e12684
+include:
+  - docs/reports/
+  - docs/experiments/
+# Nothing in the included paths is archived. (docs/reports/grug-archive.md is a current log of archived
+# experiments, not an archived document.)
+archived: []
