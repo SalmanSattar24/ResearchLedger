@@ -43,6 +43,13 @@ def main(argv: list[str] | None = None) -> int:
     pa.add_argument("--index", required=True)
     pa.add_argument("question")
 
+    ph = sub.add_parser("hand-check", help="write a seeded sample of judged items for a person to check the judge")
+    ph.add_argument("--results", required=True, help="an answers-*.json results file")
+    ph.add_argument("--out", required=True, help="output Markdown")
+    ph.add_argument("--index", help="show each claim's cited lines from this index")
+    ph.add_argument("--questions", help="show each item's question from this evaluation set")
+    ph.add_argument("-n", type=int, default=10)
+
     args = p.parse_args(argv)
     if args.cmd == "ingest":
         try:
@@ -69,6 +76,10 @@ def main(argv: list[str] | None = None) -> int:
             mark = {True: "PASS", False: "FAIL", None: "----"}[g["pass"]]
             print(f"{mark}  {g['gate']}: {g['result']} (required {g['required']})")
         print(f"written: {path}")
+    elif args.cmd == "hand-check":
+        from .eval_answers import hand_check_sample
+
+        print(f"written: {hand_check_sample(args.results, args.out, args.n, 0, args.index, args.questions)}")
     elif args.cmd == "ask":
         from .agents import ask
         from .tools import LedgerIndex

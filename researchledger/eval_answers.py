@@ -236,24 +236,52 @@ def evaluate_answers(index_path, questions_path, out_dir, aggregate_only: bool =
     return path
 
 
-def hand_check_sample(results_path: str | Path, out_path: str | Path, n: int = 10, seed: int = 0) -> Path:
-    """Write n judged items (seeded sample) as Markdown for a person to check the judge against (THRESHOLDS.md)."""
+HAND_CHECK_HOWTO = """How to mark: you are checking the judge, not the system. For each line, replace `[ ]` with `[y]` if you
+agree with the judge or `[n]` if you don't, and add a few words after an `[n]`.
+
+- **Fact lines:** read the answer above. Is the fact stated in it (by meaning, not wording)? The judge's call is shown.
+- **Claim lines:** read the cited text shown under the claim. Does that text support the claim? The judge's call is
+  shown.
+
+When done, the `[n]` marks are the disagreements; THRESHOLDS.md asks for them to be reported with the run (in
+`eval/results/README.md`). There is no pass mark: they show how far the judge's accuracy figures can be trusted."""
+
+
+def hand_check_sample(results_path: str | Path, out_path: str | Path, n: int = 10, seed: int = 0,
+                      index_path: str | Path | None = None, questions_path: str | Path | None = None) -> Path:
+    """Write n judged items (seeded sample) as Markdown for a person to check the judge against (THRESHOLDS.md).
+    With an index, each claim's cited lines are shown inline; with the questions file, each item's question."""
     import random
 
     r = json.loads(Path(results_path).read_text(encoding="utf-8"))
+    idx = LedgerIndex(index_path) if index_path else None
+    qs = {}
+    if questions_path:
+        qs = {i["id"]: i["q"] for i in yaml.safe_load(Path(questions_path).read_text(encoding="utf-8"))["items"]}
     judged = [g for g in r.get("items", []) if g["type"] != "safety" and g["status"] == "answered"]
     pick = sorted(random.Random(seed).sample(judged, min(n, len(judged))), key=lambda g: g["id"])
     out = [f"# Hand check of the judge: {Path(results_path).name}", "",
-           f"Judge model: {r['judge_model']}. For each item, mark whether you agree with every judgement.", ""]
+           f"Judge model: {r['judge_model']}.", "", HAND_CHECK_HOWTO, ""]
     for g in pick:
         out.append(f"## {g['id']} ({g['type']})")
-        out.append(f"Answer: {g['answer']['answer']}")
+        if g["id"] in qs:
+            out.append(f"**Question:** {qs[g['id']]}")
+            out.append("")
+        out.append(f"**Answer:** {g['answer']['answer']}")
+        out.append("")
         for f in g["facts"]:
-            out.append(f"- fact `{f['fact']}`: numbers {'ok' if f['numbers_ok'] else 'MISSING'}, judge says "
-                       f"{'stated' if f['judge_stated'] else 'NOT stated'}. Agree? [ ]")
+            out.append(f"- [ ] fact `{f['fact']}`: judge says **{'stated' if f['judge_stated'] else 'NOT stated'}** "
+                       f"(numbers {'found' if f['numbers_ok'] else 'missing'} in the answer)")
         for c in g["citations"]:
-            out.append(f"- claim `{c['claim']}` cites {', '.join(c['citations'])}: judge says "
-                       f"{'supported' if c['judge_supported'] else 'NOT supported'}. Agree? [ ]")
+            out.append(f"- [ ] claim `{c['claim']}`: judge says "
+                       f"**{'supported' if c['judge_supported'] else 'NOT supported'}**")
+            for cite in c["citations"]:
+                out.append(f"  - cited `{cite}`:")
+                m = re.match(r"(.+):(\d+)-(\d+)$", cite)
+                if idx and m:
+                    for t in idx.line_texts(m[1], int(m[2]), int(m[3])):
+                        if t.strip():
+                            out.append(f"    > {t.strip()}")
         out.append("")
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
     Path(out_path).write_text("\n".join(out), encoding="utf-8")
