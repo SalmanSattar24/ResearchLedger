@@ -36,7 +36,7 @@ exactly. If nothing relevant is found, say so."""
 
 SQL_INSTRUCTION = """You answer questions about tables parsed from a research record's Markdown tables. Never answer from memory.
 
-Schema (SQLite, read-only):
+Schema (read-only; write plain standard SQL, which runs on both SQLite and BigQuery):
 - tables(id, path, start_line, end_line, heading, columns)  -- one row per table; columns is a JSON list
 - table_cells(table_id, row_idx, line, col_idx, col_name, text, num)  -- one row per cell; num is the cell parsed
   as a number (92.6% -> 92.6) or NULL; line is the cell's line in the file
@@ -197,7 +197,8 @@ async def _ask_async(index: LedgerIndex, question: str, client) -> Result:
             notes = attach_sql(answer, index, ran_sql)
             problems = check_deterministic(answer, index)
             if not problems:
-                problems = check_support(answer, index, client, AGENT_MODEL, usage)
+                # a blocking call: run it off the event loop so a service can serve other requests meanwhile
+                problems = await asyncio.to_thread(check_support, answer, index, client, AGENT_MODEL, usage)
             trace.append({"answer": answer.model_dump(), "problems": problems, "notes": notes})
         except ValueError as e:
             answer, problems = None, [str(e)]

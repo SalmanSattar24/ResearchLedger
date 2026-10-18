@@ -6,6 +6,7 @@ connection with `PRAGMA query_only`, and only a single SELECT (or WITH ... SELEC
 
 from __future__ import annotations
 
+import os
 import re
 import sqlite3
 from pathlib import Path
@@ -49,7 +50,7 @@ def _fit(query: str, rows: list[tuple[int, str]], limit: int = MAX_TEXT) -> str:
 
 
 class LedgerIndex:
-    def __init__(self, index_path: str | Path, retriever: str | None = None, embed=None):
+    def __init__(self, index_path: str | Path, retriever: str | None = None, embed=None, sql_backend: str | None = None):
         from .embed import open_retriever
 
         self.path = Path(index_path)
@@ -58,6 +59,18 @@ class LedgerIndex:
         self.db.execute("PRAGMA query_only = ON")
         self.archived = {p for (p,) in self.db.execute("SELECT path FROM documents WHERE archived = 1")}
         self.name, self.commit = self.db.execute("SELECT name, commit_sha FROM corpus").fetchone()
+        # SQL backend: 'sqlite' (this file) or 'bigquery' (the exported dataset; it must hold the same commit)
+        self.sql_backend = sql_backend or os.environ.get("RL_SQL_BACKEND", "sqlite")
+        self.sql = None
+        if self.sql_backend == "bigquery":
+            from .bigquery import BigQuerySQL
+
+            self.sql = BigQuerySQL()
+            got = self.sql.run_sql("SELECT commit_sha FROM corpus")
+            if "error" in got or not got["rows"] or got["rows"][0][0] != self.commit:
+                raise RuntimeError(f"BigQuery dataset does not hold commit {self.commit[:12]}: {got}")
+        elif self.sql_backend != "sqlite":
+            raise ValueError(f"unknown SQL backend: {self.sql_backend}")
 
     # ---------------------------------------------------------------- retrieval
     def search(self, query: str, k: int = 5) -> list[dict]:
@@ -126,6 +139,8 @@ class LedgerIndex:
         q = query.strip().rstrip(";")
         if ";" in q or not _SELECT_ONLY.match(q) or _FORBIDDEN.search(q):
             return {"error": "only a single read-only SELECT statement is allowed"}
+        if self.sql is not None:
+            return self.sql.run_sql(q)
         try:
             cur = self.db.execute(q)
             rows = cur.fetchmany(MAX_ROWS + 1)

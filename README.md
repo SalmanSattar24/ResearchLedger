@@ -35,8 +35,9 @@ Git repo (pinned commit)
   metrics per request: latency per step, tokens in/out, tokens/sec, cost; session state persisted
 ```
 
-Production: Terraform for all infrastructure; CI runs unit tests and the public evaluation set and blocks a deploy
-that misses a gate; Cloud Run with IAM-only access; Secret Manager; staging and production services.
+Production: Terraform for all infrastructure; CI runs the unit tests, and the deploy workflow runs the public
+evaluation set against staging and blocks promotion to production if a gate fails; Cloud Run with IAM-only access;
+keyless credentials (Workload Identity Federation), so no stored secrets; staging and production services.
 
 ## Data boundary
 
@@ -108,6 +109,50 @@ Models run on Vertex AI in the project `researchledger-2026` (`RL_GCP_PROJECT`).
 18 Oct 2026, against 1.7 s for 3.7.) The judge in `eval-answers` is `gemini-2.5-pro`, a different model family from the agents, so
 no model grades its own output. The quota project is set per process, so application-default credentials that
 point at another project are not changed.
+
+## On GCP (step 4, written; not yet applied)
+
+```bash
+python -m researchledger embed --index .cache/index/marin.sqlite            # Vertex AI embeddings, for hybrid search
+python -m researchledger export-bigquery --index .cache/index/marin.sqlite  # load the index into BigQuery
+uvicorn researchledger.service:app --port 8080                              # REST API + MCP endpoint, locally
+```
+
+- **Hybrid retrieval.** Each chunk gets a `gemini-embedding-001` vector (768 dimensions). Search fuses the BM25
+  ranking and the vector ranking by reciprocal rank fusion. On Marin: recall@3 33 → 36 of 38, recall@10 37 → 38,
+  MRR 0.84 → 0.87, evidence@5 29 → 27 of 32 ([results](eval/results/README.md)). The private corpus stays on BM25:
+  embedding would send its text to Vertex AI.
+- **Where the data lives.**
+  - Each image carries one corpus at one commit: the SQLite index, built and embedded by the deploy workflow.
+    Search, line reads and the verifier's checks read that file, in-process, so they add no network round trips
+    to an answer.
+  - The same index is loaded into BigQuery. The SQL agent's queries run there (`RL_SQL_BACKEND=bigquery`). The
+    service account can only read the dataset, and each query is dry-run and refused unless BigQuery classifies
+    it as a single SELECT. `bigquery.vector_search` runs `VECTOR_SEARCH` over the same vectors.
+  - At startup the service checks that BigQuery holds the same commit as its image.
+- **Service (`researchledger/service.py`).** Cloud Run, with `POST /ask`, `POST /search`, `GET /healthz`, and an
+  MCP endpoint at `/mcp/` (tools `search`, `read_lines`, `ask`). Cloud Run IAM is the only access path: there are no
+  unauthenticated invokers. From Claude Code: `gcloud run services proxy researchledger-prod --port 8080`, then
+  `claude mcp add --transport http researchledger http://localhost:8080/mcp/`.
+- **Tracing.** ADK's OpenTelemetry spans (agents, model calls, tool calls) are exported to Cloud Trace.
+- **Infrastructure (`infra/`, Terraform).**
+  - APIs, Artifact Registry, the BigQuery dataset, and staging and production Cloud Run services.
+  - Two service accounts: the runtime one (Gemini, read-only BigQuery, traces) and the deployer.
+  - Workload Identity Federation for GitHub Actions, limited to this repository's `main` branch.
+  - There are no keys or secrets anywhere, so there is no Secret Manager entry to create.
+- **CI (`.github/workflows/`).**
+  - `ci.yml` runs the unit tests on every push and PR, with no network.
+  - `deploy.yml` (manual, from `main`) runs these steps:
+    1. ingests, embeds and exports the index;
+    2. builds the image and deploys it to staging;
+    3. grades the whole public evaluation set against staging, which also measures latency end to end on Cloud
+       Run;
+    4. promotes to production only if every gate passes.
+- **Latency work (no paid capacity).**
+  - Per-request timeouts (a hung call is retried rather than waited out).
+  - Low thinking for the verifier.
+  - Tool-call budgets for the sub-agents.
+  - A computed claim missing its SQL gets the query the SQL agent actually ran, so it no longer costs a retry.
 
 ## Plan
 

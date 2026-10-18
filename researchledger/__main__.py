@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 
 from .corpus import CorpusConfig
@@ -43,6 +44,12 @@ def main(argv: list[str] | None = None) -> int:
     pq.add_argument("--out", required=True)
     pq.add_argument("--aggregate-only", action="store_true")
     pq.add_argument("--only", nargs="*", help="item ids to run (default: all)")
+    pq.add_argument("--endpoint", help="grade a deployed service (its /ask) instead of running the agents here; "
+                                       "an identity token is read from RL_ID_TOKEN")
+    pq.add_argument("--fail-on-gate", action="store_true", help="exit 1 if any graded gate fails (for CI)")
+
+    px = sub.add_parser("export-bigquery", help="load an index (and its vectors) into the BigQuery dataset")
+    px.add_argument("--index", required=True)
 
     pa = sub.add_parser("ask", help="answer one question with the agents (calls Gemini on Vertex AI)")
     pa.add_argument("--index", required=True)
@@ -77,16 +84,23 @@ def main(argv: list[str] | None = None) -> int:
         from .eval_answers import evaluate_answers
 
         path = evaluate_answers(args.index, args.questions, args.out, args.aggregate_only, args.only,
-                                progress=lambda m: print(m, flush=True))
+                                progress=lambda m: print(m, flush=True), endpoint=args.endpoint,
+                                token=os.environ.get("RL_ID_TOKEN"))
         summary = json.loads(path.read_text(encoding="utf-8"))["summary"]
         for g in summary["gates"]:
             mark = {True: "PASS", False: "FAIL", None: "----"}[g["pass"]]
             print(f"{mark}  {g['gate']}: {g['result']} (required {g['required']})")
         print(f"written: {path}")
+        if args.fail_on_gate and any(g["pass"] is False for g in summary["gates"]):
+            return 1
     elif args.cmd == "hand-check":
         from .eval_answers import hand_check_sample
 
         print(f"written: {hand_check_sample(args.results, args.out, args.n, 0, args.index, args.questions)}")
+    elif args.cmd == "export-bigquery":
+        from .bigquery import export_index
+
+        print(json.dumps(export_index(args.index), indent=2))
     elif args.cmd == "embed":
         from .embed import embed_index
 
