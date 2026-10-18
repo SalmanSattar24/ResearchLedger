@@ -56,3 +56,61 @@ item's fact.
 
 **Caveat:** the dropped table-row experiment was judged on these same evaluation sets. There is no held-out set, so
 any further tuning against them risks overfitting, and will be reported as such.
+
+## Answers (step 3: agents and verifier, Marin only)
+
+The private research corpus has not been run through the agents. That would send its text to Gemini, which waits
+on the corpus owner's consent.
+
+Each run answers all 41 items with the agents, then grades every gate in `eval/THRESHOLDS.md`. Numbers, citation
+overlap, verdict labels and safety are graded deterministically; the judge model (`gemini-2.5-pro`, a different
+family from the agents) grades only meaning. The judge prompts and models are stored in each results file.
+Latency is measured locally, not yet on Cloud Run.
+
+| Gate | Run 1 (`…032738`, 3.8-flash) | Run 3 (`…045520`, 3.7-flash) | Required |
+|---|---|---|---|
+| Answer accuracy, overall | 25/38 | 24/38 | >= 31 |
+| lookup | 11/12 | 9/12 | >= 9 |
+| why | 3/8 | 4/8 | >= 6 |
+| superseded | 4/8 | 6/8 | >= 6 |
+| claim | 4/7 | 2/7 | >= 5 |
+| table (reported only) | 3/3 | 3/3 | no gate |
+| Citation support | 91/92 | 100/101 | >= 90% |
+| Citation recall | 35/38 | 36/38 | >= 33 |
+| Superseded handling | 4/8 | 6/8 | >= 6 |
+| Claim verdicts | 5/7 | 6/7 | >= 6 |
+| Safety | 3/3 | 3/3 | 3/3 |
+| Latency p95 (local) | 92.4 s | 52.3 s | <= 20 s |
+| Cost per question (mean) | $0.0142 | $0.0104 | <= $0.02 |
+
+Run 3 passes 8 of the 12 graded gates. It fails overall accuracy, "why" and claim accuracy, and latency.
+
+**Between runs 1 and 3** (changes are general, but all were judged on this same set, so there is overfitting risk):
+- The coordinator was told to answer completely and to use the set's own definition of "partly".
+- The evidence pack keeps the chunk lines that match the question rather than only a chunk's first 600 characters.
+- The agent model changed for latency: `gemini-3.8-flash` answered a one-word prompt in a median 22.8 s on 18 Oct
+  2026, against 1.7 s for `gemini-3.7-flash` at the same price.
+
+**Run 2** used `gemini-3.8-flash` with the run 3 prompts. It was stopped after 20 items, which took up to 822 s each;
+the log is in `answers-marin-run2-stopped.log` and no results file was written.
+
+**What the run 3 failures are:**
+- **Fact left out (6):** L04, L07, L08, W06, C04, C07. The answer is right as far as it goes but omits a required
+  fact or number.
+- **Judge-only misses (6):** W02, W04, W05, S06, C02, C03. All numbers are present but the judge said a phrase was
+  missing. Read by hand: 5 are genuine omissions; S06 is a judge false negative.
+- **Exact number missing (2):** S03 and C05. The judge accepted the fact, but the answer did not write the number
+  ("80,000", "from 4Mi").
+
+The main weakness is completeness, not correctness: citation support is 99% and no answer asserted a forbidden
+statement.
+
+**Latency** in run 3: median 10.7 s, p90 25.9 s, p95 52.3 s. 25 of 41 questions took the fast path (one
+coordinator call plus the verifier); delegation and verifier retries make up the tail. The shared Gemini quota
+also returned 429s that needed backoff. Meeting 20 s at p95 likely needs fewer sequential model calls and dedicated
+capacity (provisioned throughput or a priority tier), a cost decision for step 4.
+
+**Hand check:** a seeded sample of 10 judged items from run 3 is in
+`eval/review/hand-check-answers-marin-20261018T045520.md` for the researcher to mark.
+
+**Judge cost** (not counted in the per-question gate): $0.57 in run 1 and $0.65 in run 3.
