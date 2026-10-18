@@ -28,6 +28,8 @@ CREATE TABLE tables (id INTEGER PRIMARY KEY, path TEXT, start_line INTEGER, end_
 CREATE TABLE table_cells (table_id INTEGER, row_idx INTEGER, line INTEGER, col_idx INTEGER, col_name TEXT,
                           text TEXT, num REAL);
 CREATE TABLE redactions (path TEXT, line INTEGER, param TEXT);
+CREATE TABLE doc_lines (path TEXT, line INTEGER, text TEXT, PRIMARY KEY (path, line));
+CREATE TABLE documents (path TEXT PRIMARY KEY, archived INTEGER);
 """
 
 
@@ -45,6 +47,7 @@ def ingest(config: CorpusConfig, out_path: str | Path, source: GitSource | None 
     skipped: Counter[str] = Counter()
     unsupported: list[dict] = []
     chunks, tables = [], []
+    doc_lines: list[tuple[str, int, str]] = []
 
     for path in files:
         if not is_allowed(path):
@@ -60,6 +63,7 @@ def ingest(config: CorpusConfig, out_path: str | Path, source: GitSource | None 
         redactions += scan.redactions
         ingested[_ext(path)] += 1
         chunks += chunk_document(path, scan.lines)
+        doc_lines += [(path, n, s) for n, s in dict(scan.lines).items()]  # last text wins on a repeated number
         tables += extract_tables(path, scan.lines)
 
     if findings:
@@ -106,6 +110,9 @@ def ingest(config: CorpusConfig, out_path: str | Path, source: GitSource | None 
                 ],
             )
         db.executemany("INSERT INTO redactions VALUES (?, ?, ?)", [(r.path, r.line, r.param) for r in redactions])
+        db.executemany("INSERT INTO doc_lines VALUES (?, ?, ?)", doc_lines)
+        db.executemany("INSERT INTO documents VALUES (?, ?)",
+                       [(p, int(config.is_archived(p))) for p in sorted({d[0] for d in doc_lines})])
     db.close()
     verify_index(tmp)
     os.replace(tmp, out_path)

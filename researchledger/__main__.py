@@ -32,6 +32,17 @@ def main(argv: list[str] | None = None) -> int:
     pe.add_argument("--out", required=True, help="results directory")
     pe.add_argument("--aggregate-only", action="store_true", help="omit per-item rows (for private corpora)")
 
+    pq = sub.add_parser("eval-answers", help="run the agents on an evaluation set and grade every gate (calls Gemini)")
+    pq.add_argument("--index", required=True)
+    pq.add_argument("--questions", required=True)
+    pq.add_argument("--out", required=True)
+    pq.add_argument("--aggregate-only", action="store_true")
+    pq.add_argument("--only", nargs="*", help="item ids to run (default: all)")
+
+    pa = sub.add_parser("ask", help="answer one question with the agents (calls Gemini on Vertex AI)")
+    pa.add_argument("--index", required=True)
+    pa.add_argument("question")
+
     args = p.parse_args(argv)
     if args.cmd == "ingest":
         try:
@@ -48,6 +59,25 @@ def main(argv: list[str] | None = None) -> int:
         path = write_results(results, args.out, aggregate_only=args.aggregate_only)
         print(json.dumps({"overall": results["overall"], "by_type": results["by_type"]}, indent=2))
         print(f"written: {path}")
+    elif args.cmd == "eval-answers":
+        from .eval_answers import evaluate_answers
+
+        path = evaluate_answers(args.index, args.questions, args.out, args.aggregate_only, args.only,
+                                progress=lambda m: print(m, flush=True))
+        summary = json.loads(path.read_text(encoding="utf-8"))["summary"]
+        for g in summary["gates"]:
+            mark = {True: "PASS", False: "FAIL", None: "----"}[g["pass"]]
+            print(f"{mark}  {g['gate']}: {g['result']} (required {g['required']})")
+        print(f"written: {path}")
+    elif args.cmd == "ask":
+        from .agents import ask
+        from .tools import LedgerIndex
+
+        r = ask(LedgerIndex(args.index), args.question)
+        print(r.answer.model_dump_json(indent=2))
+        print(json.dumps({"attempts": r.attempts, "problems": r.problems, "seconds": r.seconds, "usage": r.usage,
+                          "trace": r.trace},
+                         indent=2))
     return 0
 
 

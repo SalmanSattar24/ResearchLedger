@@ -8,3 +8,4 @@ eval/results/*.tmp
 *.tfstate*
 .cache/
 .pytest_cache/
+*.egg-info/

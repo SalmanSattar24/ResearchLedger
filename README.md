@@ -5,9 +5,12 @@ log, deviations log, protocol, notebooks, result tables) with citations to the e
 track of facts that were later superseded, and checks whether a claim (in a CV, abstract or draft) is backed by the
 record.
 
-Status (17 Oct 2026): **step 2, local ingestion and keyword retrieval, is built and measured; no agents yet.**
-Each corpus's evaluation set and the pass thresholds (`eval/THRESHOLDS.md`) were fixed before any code was written.
-Retrieval results so far: [`eval/results/`](eval/results/README.md).
+Status (18 Oct 2026): **step 3, the ADK agents and the verifier, is built and measured on the public set.**
+- **Passing (8 of 12 graded gates):** citation support 99%, citation recall 95%, safety, cost ($0.010 per
+  question), superseded handling and claim verdicts.
+- **Failing:** answer accuracy (24/38; answers tend to leave out secondary facts) and latency (p95 52 s locally).
+- Each corpus's evaluation set and the pass thresholds (`eval/THRESHOLDS.md`) were fixed before any code was
+  written. All results, including failures, are in [`eval/results/`](eval/results/README.md).
 
 ## Design
 
@@ -73,6 +76,38 @@ python -m researchledger eval-retrieval --index .cache/index/marin.sqlite --ques
 
 Ingestion reads the pinned commit from git objects (a blobless clone into `.cache/` for a remote corpus), so the
 source working tree is never read or changed. The index is SQLite locally; BigQuery replaces it in step 4.
+
+## Answering (step 3)
+
+```bash
+python -m pip install -e ".[dev,agents]"
+gcloud auth application-default login   # once; the agents call Gemini on Vertex AI with these credentials
+python -m researchledger ask --index .cache/index/marin.sqlite "Why did the 32B run switch to the Qwen3 backbone?"
+python -m researchledger eval-answers --index .cache/index/marin.sqlite --questions eval/questions.yaml --out eval/results
+```
+
+How a question is answered (`researchledger/agents.py`):
+
+1. **Retrieve first, then read.** A keyword search runs before any model call. Its top passages, each line with its
+   number and an archived flag, go to the coordinator in its first message.
+2. **Coordinator (ADK `LlmAgent`).** It answers from that evidence when it can (the fast path). When it can't, it
+   delegates through `AgentTool` to:
+   - a **retrieval agent**, which searches with new phrasings and reads exact lines, preferring current over
+     archived files;
+   - a **SQL agent**, which runs read-only queries over the parsed tables.
+3. **Verifier (`researchledger/verify.py`).**
+   - Deterministic checks first: each cited range exists; every number and quote in a claim is in its cited lines
+     (or the file's path and section heading); a computed claim's SQL is re-run; no leakage in the answer.
+   - Then a model reads only the cited lines and says whether they support each claim.
+   - On failure the coordinator gets the reasons and the actual cited text for one retry. If that also fails, the
+     system abstains.
+4. **Accounting.** Every model call is timed and costed per agent.
+
+Models run on Vertex AI in the project `researchledger-2026` (`RL_GCP_PROJECT`). The agents use
+`gemini-3.7-flash`. (`gemini-3.8-flash` costs the same but answered a one-word prompt in a median 22.8 s on
+18 Oct 2026, against 1.7 s for 3.7.) The judge in `eval-answers` is `gemini-2.5-pro`, a different model family from the agents, so
+no model grades its own output. The quota project is set per process, so application-default credentials that
+point at another project are not changed.
 
 ## Plan
 
