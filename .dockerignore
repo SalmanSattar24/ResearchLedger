@@ -1,0 +1,11 @@
+.git
+.venv
+.cache/corpora
+**/__pycache__
+.pytest_cache
+*.egg-info
+eval/results
+eval/review
+infra/.terraform
+infra/*.tfstate*
+.cache/index/*-backup.sqlite

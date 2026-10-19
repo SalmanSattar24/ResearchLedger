@@ -122,8 +122,8 @@ def check_deterministic(answer: Answer, index: LedgerIndex) -> list[str]:
             res = index.run_sql(c.sql)
             if "error" in res:
                 problems.append(f"claim {i}: its SQL failed to run: {res['error']}")
-            else:  # the query's own constants (e.g. a threshold) and its result both count
-                evidence += "\n" + c.sql + "\n" + json.dumps(res["rows"])
+            else:  # the query's own constants (e.g. a threshold), its rows and its row count all count
+                evidence += "\n" + sql_evidence(c.sql, res)
         for n in sorted(numbers(c.text)):
             supported_numbers.add(n)
             if joined and not _has_number(n, evidence):
@@ -138,6 +138,35 @@ def check_deterministic(answer: Answer, index: LedgerIndex) -> list[str]:
     if problems:
         problems.append("what the cited lines actually say:\n" + cited_text(answer, index))
     return problems
+
+
+def sql_evidence(query: str, result: dict) -> str:
+    """What a computed claim may draw numbers from: the query text, its rows, and how many rows it returned."""
+    return f"{query}\n{json.dumps(result['rows'])}\nrows returned: {len(result['rows'])}"
+
+
+def attach_sql(answer: Answer, index: LedgerIndex, queries: list[str]) -> list[str]:
+    """Give a computed claim that came back without its query the query sql_agent actually ran.
+
+    A claim with no `sql` whose numbers are missing from its cited lines gets the first query run in this attempt
+    whose text and result contain all of them. The query is re-run here, and again by check_deterministic, so
+    nothing is taken on trust. Returns a note per attached query (for the trace)."""
+    notes = []
+    for i, c in enumerate(answer.claims, 1):
+        if c.sql or not c.citations:
+            continue
+        cited = "\n".join(t for cit in c.citations for t in index.line_texts(cit.path, cit.start, cit.end))
+        cited += "\n" + "\n".join(citation_context(index, cit) for cit in c.citations)
+        missing = [n for n in numbers(c.text) if not _has_number(n, cited)]
+        if not missing:
+            continue
+        for q in queries:
+            res = index.run_sql(q)
+            if "error" not in res and all(_has_number(n, sql_evidence(q, res)) for n in missing):
+                c.sql = q
+                notes.append(f"claim {i}: attached the query sql_agent ran: {q}")
+                break
+    return notes
 
 
 def cited_text(answer: Answer, index: LedgerIndex, max_chars: int = 300) -> str:
@@ -157,8 +186,9 @@ def claim_evidence(claim: Claim, index: LedgerIndex) -> str:
         rows = index.read_lines(cit.path, cit.start, cit.end).get("lines", [])
         blocks.append(f"File {citation_context(index, cit)}:\n" + "\n".join(rows))
     if claim.sql:
-        blocks.append(f"Computed by SQL over the parsed table: {claim.sql}\nResult: "
-                      f"{json.dumps(index.run_sql(claim.sql).get('rows'))}")
+        res = index.run_sql(claim.sql)
+        blocks.append("Computed by SQL over the parsed table (query, result rows, row count):\n" +
+                      (sql_evidence(claim.sql, res) if "error" not in res else f"{claim.sql}\n{res['error']}"))
     return "\n".join(blocks)
 
 
@@ -181,12 +211,17 @@ def check_support(answer: Answer, index: LedgerIndex, client, model: str, usage=
     parts = [f"[{i}] {c.text}\n{claim_evidence(c, index)}" for i, c in enumerate(answer.claims, 1)]
     from google.genai import types
 
+    from .llm import CALL_TIMEOUT_MS, RETRY
+
     if usage is not None:
         usage.start("verifier")
     resp = client.models.generate_content(
         model=model,
         contents=SUPPORT_PROMPT + "\n\n".join(parts),
-        config=types.GenerateContentConfig(temperature=0, response_mime_type="application/json"),
+        config=types.GenerateContentConfig(
+            temperature=0, response_mime_type="application/json",
+            thinking_config=types.ThinkingConfig(thinking_level="low"),
+            http_options=types.HttpOptions(timeout=CALL_TIMEOUT_MS["verifier"], retry_options=RETRY)),
     )
     if usage is not None:
         usage.record("verifier", model, resp.usage_metadata)

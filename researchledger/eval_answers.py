@@ -141,7 +141,7 @@ def _ratio(n: int, d: int) -> str:
     return f"{n}/{d} ({n / d:.0%})" if d else "0/0"
 
 
-def summarize(graded: list[dict]) -> dict:
+def summarize(graded: list[dict], where: str = "local") -> dict:
     non_safety = [g for g in graded if g["type"] != "safety"]
     by_type = defaultdict(list)
     for g in non_safety:
@@ -182,26 +182,59 @@ def summarize(graded: list[dict]) -> dict:
     gates.append(gate("claim verdicts", _ratio(v, len(claims)), f">= {need}", v >= need))
     sf = sum(g["safe"] for g in safety)
     gates.append(gate("safety", _ratio(sf, len(safety)), f"{len(safety)}/{len(safety)}", sf == len(safety)))
-    gates.append(gate("latency p95 (local, not Cloud Run yet)", f"{p95:.1f} s", "<= 20 s",
+    label = "latency p95 (local, not Cloud Run)" if where == "local" else "latency p95 (Cloud Run, end to end)"
+    gates.append(gate(label, f"{p95:.1f} s", "<= 20 s",
                       p95 <= THRESHOLDS["latency_p95_s"]))
     gates.append(gate("cost per question (mean)", f"${mean_cost:.4f}", "<= $0.02",
                       mean_cost <= THRESHOLDS["cost_mean_usd"]))
     return {"gates": gates, "items": len(graded)}
 
 
+def remote_asker(endpoint: str, token: str | None = None):
+    """Ask a deployed service instead of running the agents here. Latency is end to end as a client sees it
+    (network included). The service must serve the same corpus commit as the local index used for grading."""
+    import time
+
+    import httpx
+
+    from .agents import Result
+    from .verify import Answer
+
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
+    http = httpx.Client(base_url=endpoint.rstrip("/"), headers=headers, timeout=300)
+    health = http.get("/healthz")  # also wakes a scaled-to-zero service, so a cold start is not graded
+    health.raise_for_status()
+
+    def ask_remote(index, question, client=None):
+        if health.json()["commit"] != index.commit:
+            raise ValueError(f"service serves {health.json()['commit'][:12]}, the index is {index.commit[:12]}")
+        t = time.perf_counter()
+        resp = http.post("/ask", json={"question": question, "trace": True})
+        resp.raise_for_status()
+        d = resp.json()
+        return Result(question, Answer.model_validate(d["answer"]), d["attempts"], d["problems"],
+                      round(time.perf_counter() - t, 2), d["usage"], d.get("trace", []))
+
+    return ask_remote, health.json()
+
+
 def evaluate_answers(index_path, questions_path, out_dir, aggregate_only: bool = False, only: list[str] | None = None,
-                     progress=print) -> Path:
+                     progress=print, endpoint: str | None = None, token: str | None = None) -> Path:
     qs = yaml.safe_load(Path(questions_path).read_text(encoding="utf-8"))
     index = LedgerIndex(index_path)
     if not index.commit.startswith(str(qs["corpus"]["commit"])):
         raise ValueError(f"index is at {index.commit[:12]} but the set is pinned to {qs['corpus']['commit']}")
     client = genai_client()
+    answer, served_by = ask, {"where": "local"}
+    if endpoint:
+        answer, health = remote_asker(endpoint, token)
+        served_by = {"where": endpoint, **health}
     graded, judge_usage = [], []
     for it in qs["items"]:
         if only and it["id"] not in only:
             continue
         try:
-            r = ask(index, it["q"], client)
+            r = answer(index, it["q"], client)
         except Exception as e:  # an API failure counts against the run; it does not stop it
             from .agents import Result
             from .verify import Answer
@@ -221,10 +254,10 @@ def evaluate_answers(index_path, questions_path, out_dir, aggregate_only: bool =
     result = {
         "corpus": index.name, "commit": index.commit,
         "run_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "agent_model": AGENT_MODEL, "judge_model": JUDGE_MODEL,
+        "agent_model": AGENT_MODEL, "judge_model": JUDGE_MODEL, "served_by": served_by,
         "judge_prompts": {"facts": FACT_PROMPT, "citations": SUPPORT_PROMPT},
         "judge_cost_usd": round(sum(judge_usage), 4),
-        "summary": summarize(graded),
+        "summary": summarize(graded, served_by["where"]),
     }
     if not aggregate_only:
         result["items"] = graded
@@ -236,24 +269,52 @@ def evaluate_answers(index_path, questions_path, out_dir, aggregate_only: bool =
     return path
 
 
-def hand_check_sample(results_path: str | Path, out_path: str | Path, n: int = 10, seed: int = 0) -> Path:
-    """Write n judged items (seeded sample) as Markdown for a person to check the judge against (THRESHOLDS.md)."""
+HAND_CHECK_HOWTO = """How to mark: you are checking the judge, not the system. For each line, replace `[ ]` with `[y]` if you
+agree with the judge or `[n]` if you don't, and add a few words after an `[n]`.
+
+- **Fact lines:** read the answer above. Is the fact stated in it (by meaning, not wording)? The judge's call is shown.
+- **Claim lines:** read the cited text shown under the claim. Does that text support the claim? The judge's call is
+  shown.
+
+When done, the `[n]` marks are the disagreements; THRESHOLDS.md asks for them to be reported with the run (in
+`eval/results/README.md`). There is no pass mark: they show how far the judge's accuracy figures can be trusted."""
+
+
+def hand_check_sample(results_path: str | Path, out_path: str | Path, n: int = 10, seed: int = 0,
+                      index_path: str | Path | None = None, questions_path: str | Path | None = None) -> Path:
+    """Write n judged items (seeded sample) as Markdown for a person to check the judge against (THRESHOLDS.md).
+    With an index, each claim's cited lines are shown inline; with the questions file, each item's question."""
     import random
 
     r = json.loads(Path(results_path).read_text(encoding="utf-8"))
+    idx = LedgerIndex(index_path) if index_path else None
+    qs = {}
+    if questions_path:
+        qs = {i["id"]: i["q"] for i in yaml.safe_load(Path(questions_path).read_text(encoding="utf-8"))["items"]}
     judged = [g for g in r.get("items", []) if g["type"] != "safety" and g["status"] == "answered"]
     pick = sorted(random.Random(seed).sample(judged, min(n, len(judged))), key=lambda g: g["id"])
     out = [f"# Hand check of the judge: {Path(results_path).name}", "",
-           f"Judge model: {r['judge_model']}. For each item, mark whether you agree with every judgement.", ""]
+           f"Judge model: {r['judge_model']}.", "", HAND_CHECK_HOWTO, ""]
     for g in pick:
         out.append(f"## {g['id']} ({g['type']})")
-        out.append(f"Answer: {g['answer']['answer']}")
+        if g["id"] in qs:
+            out.append(f"**Question:** {qs[g['id']]}")
+            out.append("")
+        out.append(f"**Answer:** {g['answer']['answer']}")
+        out.append("")
         for f in g["facts"]:
-            out.append(f"- fact `{f['fact']}`: numbers {'ok' if f['numbers_ok'] else 'MISSING'}, judge says "
-                       f"{'stated' if f['judge_stated'] else 'NOT stated'}. Agree? [ ]")
+            out.append(f"- [ ] fact `{f['fact']}`: judge says **{'stated' if f['judge_stated'] else 'NOT stated'}** "
+                       f"(numbers {'found' if f['numbers_ok'] else 'missing'} in the answer)")
         for c in g["citations"]:
-            out.append(f"- claim `{c['claim']}` cites {', '.join(c['citations'])}: judge says "
-                       f"{'supported' if c['judge_supported'] else 'NOT supported'}. Agree? [ ]")
+            out.append(f"- [ ] claim `{c['claim']}`: judge says "
+                       f"**{'supported' if c['judge_supported'] else 'NOT supported'}**")
+            for cite in c["citations"]:
+                out.append(f"  - cited `{cite}`:")
+                m = re.match(r"(.+):(\d+)-(\d+)$", cite)
+                if idx and m:
+                    for t in idx.line_texts(m[1], int(m[2]), int(m[3])):
+                        if t.strip():
+                            out.append(f"    > {t.strip()}")
         out.append("")
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
     Path(out_path).write_text("\n".join(out), encoding="utf-8")

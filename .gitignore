@@ -9,3 +9,14 @@ eval/results/*.tmp
 .cache/
 .pytest_cache/
 *.egg-info/
+
+# Terraform: state and real variable values stay local
+infra/.terraform/
+infra/*.tfstate
+infra/*.tfstate.*
+infra/terraform.tfvars
+infra/.terraform.lock.hcl.bak
+infra/*.tfplan
+infra/plan.txt
+infra/apply*.txt
+infra/plan*.txt

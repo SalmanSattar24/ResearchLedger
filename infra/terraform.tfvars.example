@@ -1,0 +1,2 @@
+# Copy to terraform.tfvars (git-ignored) and fill in.
+invokers = ["user:you@example.com"]

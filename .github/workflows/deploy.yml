@@ -1,0 +1,86 @@
+# Build, deploy to staging, grade the public evaluation set against staging, and promote to production only if
+# every gate in eval/THRESHOLDS.md passes. Run by hand from main (Actions > deploy > Run workflow): a full run
+# calls Gemini for about 40 questions plus the judge, roughly $0.50-1.
+#
+# Credentials: Workload Identity Federation, no keys. Repository variables WIF_PROVIDER and DEPLOYER_SA come from
+# `terraform output` in infra/.
+name: deploy
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  PROJECT: researchledger-2026
+  REGION: us-central1
+  IMAGE: us-central1-docker.pkg.dev/researchledger-2026/researchledger/service
+
+jobs:
+  staging:
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.image.outputs.ref }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.DEPLOYER_SA }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - run: python -m pip install -e ".[dev,service]" && python -m pytest -q
+
+      # The index: Marin at the pinned commit, leakage-scanned, embedded, and loaded into BigQuery.
+      - run: python -m researchledger ingest --corpus corpora/marin.yaml --index .cache/index/marin.sqlite
+      - run: python -m researchledger embed --index .cache/index/marin.sqlite
+      - run: python -m researchledger export-bigquery --index .cache/index/marin.sqlite
+
+      - id: image
+        run: echo "ref=${IMAGE}:${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+      - run: |
+          gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+          docker build -t "${{ steps.image.outputs.ref }}" .
+          docker push "${{ steps.image.outputs.ref }}"
+      - run: gcloud run deploy researchledger-staging --image "${{ steps.image.outputs.ref }}" --region "$REGION" --project "$PROJECT" --quiet
+      - id: url
+        run: echo "url=$(gcloud run services describe researchledger-staging --region "$REGION" --project "$PROJECT" --format='value(status.url)')" >> "$GITHUB_OUTPUT"
+
+      # Grade staging end to end (latency as a client sees it). The gate step fails the job on any failed gate.
+      - id: token
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.DEPLOYER_SA }}
+          token_format: id_token
+          id_token_audience: ${{ steps.url.outputs.url }}
+          id_token_include_email: true
+      - run: python -m researchledger eval-answers --index .cache/index/marin.sqlite --questions eval/questions.yaml --out eval/results --endpoint "${{ steps.url.outputs.url }}" --fail-on-gate
+        env:
+          RL_ID_TOKEN: ${{ steps.token.outputs.id_token }}
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results
+          path: eval/results/answers-*.json
+
+  production:
+    needs: staging
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.DEPLOYER_SA }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - run: gcloud run deploy researchledger-prod --image "${{ needs.staging.outputs.image }}" --region "$REGION" --project "$PROJECT" --quiet
