@@ -45,20 +45,40 @@ CALL_TIMEOUT_MS = {"coordinator": 25_000, "retrieval_agent": 15_000, "sql_agent"
 TOOL_BUDGET = {"retrieval_agent": 3, "sql_agent": 4}
 
 
+def _is_user_login(creds) -> bool:
+    from google.oauth2 import credentials as user_credentials
+
+    return isinstance(creds, user_credentials.Credentials)
+
+
+def credentials():
+    """Application-default credentials for PROJECT.
+
+    A person's login (gcloud auth application-default login) may carry another project as quota project, so it is
+    billed to PROJECT explicitly. Service accounts (Cloud Run) and federated identities (GitHub Actions) already
+    bill to their own project, and a quota project on them would require the extra Service Usage Consumer role."""
+    import google.auth
+
+    creds, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+    return creds.with_quota_project(PROJECT) if _is_user_login(creds) else creds
+
+
 def configure_vertex() -> None:
     """Point google-genai (used by ADK) at Vertex AI in PROJECT, for this process only."""
     os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "TRUE"
     os.environ["GOOGLE_CLOUD_PROJECT"] = PROJECT
     os.environ["GOOGLE_CLOUD_LOCATION"] = LOCATION
-    os.environ["GOOGLE_CLOUD_QUOTA_PROJECT"] = PROJECT
+    if _is_user_login(credentials()):
+        os.environ["GOOGLE_CLOUD_QUOTA_PROJECT"] = PROJECT
+    else:
+        os.environ.pop("GOOGLE_CLOUD_QUOTA_PROJECT", None)
 
 
 def genai_client():
-    import google.auth
     from google import genai
 
     configure_vertex()
-    creds, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"], quota_project_id=PROJECT)
+    creds = credentials()
     return genai.Client(vertexai=True, project=PROJECT, location=LOCATION, credentials=creds,
                         http_options=genai.types.HttpOptions(retry_options=RETRY))
 

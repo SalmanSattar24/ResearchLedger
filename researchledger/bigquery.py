@@ -45,11 +45,11 @@ VECTORS = [("chunk_id", "INT64"), ("model", "STRING"), ("embedding", "FLOAT64", 
 
 
 def client(project: str = PROJECT):
-    import google.auth
     from google.cloud import bigquery
 
-    creds, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"], quota_project_id=project)
-    return bigquery.Client(project=project, credentials=creds, location=LOCATION,
+    from .llm import credentials
+
+    return bigquery.Client(project=project, credentials=credentials(), location=LOCATION,
                            default_job_creation_mode="JOB_CREATION_OPTIONAL")
 
 
