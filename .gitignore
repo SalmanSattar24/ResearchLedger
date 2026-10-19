@@ -18,3 +18,5 @@ infra/terraform.tfvars
 infra/.terraform.lock.hcl.bak
 infra/*.tfplan
 infra/plan.txt
+infra/apply*.txt
+infra/plan*.txt
