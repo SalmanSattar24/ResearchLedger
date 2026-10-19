@@ -68,7 +68,13 @@ def configure_vertex() -> None:
     os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "TRUE"
     os.environ["GOOGLE_CLOUD_PROJECT"] = PROJECT
     os.environ["GOOGLE_CLOUD_LOCATION"] = LOCATION
-    if _is_user_login(credentials()):
+    import google.auth.exceptions
+
+    try:
+        person = _is_user_login(credentials())
+    except google.auth.exceptions.DefaultCredentialsError:  # none here (e.g. unit tests); model calls fail later
+        person = False
+    if person:
         os.environ["GOOGLE_CLOUD_QUOTA_PROJECT"] = PROJECT
     else:
         os.environ.pop("GOOGLE_CLOUD_QUOTA_PROJECT", None)
