@@ -21,13 +21,12 @@ provider "google" {
   user_project_override = true # bill API calls to this project, not the caller's default quota project
 }
 
-data "google_project" "this" {}
-
 locals {
   services = [
     "aiplatform.googleapis.com",
     "artifactregistry.googleapis.com",
     "bigquery.googleapis.com",
+    "cloudresourcemanager.googleapis.com", # project IAM bindings
     "cloudtrace.googleapis.com",
     "iam.googleapis.com",
     "iamcredentials.googleapis.com",
@@ -88,10 +87,11 @@ resource "google_service_account" "runtime" {
 }
 
 resource "google_project_iam_member" "runtime" {
-  for_each = toset(["roles/aiplatform.user", "roles/bigquery.jobUser", "roles/cloudtrace.agent"])
-  project  = var.project
-  role     = each.value
-  member   = google_service_account.runtime.member
+  for_each   = toset(["roles/aiplatform.user", "roles/bigquery.jobUser", "roles/cloudtrace.agent"])
+  project    = var.project
+  role       = each.value
+  member     = google_service_account.runtime.member
+  depends_on = [google_project_service.apis]
 }
 
 resource "google_bigquery_dataset_iam_member" "runtime_reads" {
@@ -108,10 +108,11 @@ resource "google_service_account" "deployer" {
 }
 
 resource "google_project_iam_member" "deployer" {
-  for_each = toset(["roles/aiplatform.user", "roles/bigquery.jobUser", "roles/run.developer"])
-  project  = var.project
-  role     = each.value
-  member   = google_service_account.deployer.member
+  for_each   = toset(["roles/aiplatform.user", "roles/bigquery.jobUser", "roles/run.developer"])
+  project    = var.project
+  role       = each.value
+  member     = google_service_account.deployer.member
+  depends_on = [google_project_service.apis]
 }
 
 resource "google_bigquery_dataset_iam_member" "deployer_loads" {
