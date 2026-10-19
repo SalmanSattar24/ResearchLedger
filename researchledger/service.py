@@ -1,6 +1,6 @@
 """HTTP service (Cloud Run): REST API and an MCP endpoint over one index.
 
-    GET  /healthz         corpus, commit, retriever and SQL backend
+    GET  /health          corpus, commit, retriever and SQL backend
     POST /search          {"query", "k"}: hybrid search, numbered lines and archived flags
     POST /ask             {"question", "trace"}: the agents and the verifier; answer, timing, tokens, cost
     /mcp/                 MCP (streamable HTTP): tools search, read_lines, ask
@@ -96,7 +96,7 @@ def create_app(index_path: str | None = None) -> FastAPI:
 
     app = FastAPI(title="ResearchLedger", lifespan=lifespan)
     app.mount("/mcp", mcp_app)
-    app.get("/healthz")(healthz)
+    app.get("/health")(health)
     app.post("/search")(search)
     app.post("/ask")(ask)
     return app
@@ -121,7 +121,7 @@ async def _answer(question: str, trace: bool) -> dict:
     return out
 
 
-def healthz() -> dict:
+def health() -> dict:
     ix = state.index
     return {"corpus": ix.name, "commit": ix.commit, "retriever": type(ix.retriever).__name__,
             "sql_backend": ix.sql_backend}

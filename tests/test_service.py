@@ -23,7 +23,7 @@ def client(tmp_path, monkeypatch):
 
 def test_health_and_search(client):
     c, sha = client
-    h = c.get("/healthz").json()
+    h = c.get("/health").json()
     assert h == {"corpus": "t", "commit": sha, "retriever": "BM25Index", "sql_backend": "sqlite"}
     hits = c.post("/search", json={"query": "which tokenizer", "k": 1}).json()
     assert hits[0]["path"] == "docs/b.md" and hits[0]["text"].startswith("1: # Beta run")
