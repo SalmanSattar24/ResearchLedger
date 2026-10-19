@@ -134,7 +134,7 @@ uvicorn researchledger.service:app --port 8080                              # RE
     service account can only read the dataset, and each query is dry-run and refused unless BigQuery classifies
     it as a single SELECT. `bigquery.vector_search` runs `VECTOR_SEARCH` over the same vectors.
   - At startup the service checks that BigQuery holds the same commit as its image.
-- **Service (`researchledger/service.py`).** Cloud Run, with `POST /ask`, `POST /search`, `GET /healthz`, and an
+- **Service (`researchledger/service.py`).** Cloud Run, with `POST /ask`, `POST /search`, `GET /health` (not `/healthz`, which Cloud Run reserves), and an
   MCP endpoint at `/mcp/` (tools `search`, `read_lines`, `ask`). Cloud Run IAM is the only access path: there are no
   unauthenticated invokers. From Claude Code: `gcloud run services proxy researchledger-prod --port 8080`, then
   `claude mcp add --transport http researchledger http://localhost:8080/mcp/`.

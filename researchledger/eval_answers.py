@@ -202,7 +202,7 @@ def remote_asker(endpoint: str, token: str | None = None):
 
     headers = {"Authorization": f"Bearer {token}"} if token else {}
     http = httpx.Client(base_url=endpoint.rstrip("/"), headers=headers, timeout=300)
-    health = http.get("/healthz")  # also wakes a scaled-to-zero service, so a cold start is not graded
+    health = http.get("/health")  # also wakes a scaled-to-zero service, so a cold start is not graded
     health.raise_for_status()
 
     def ask_remote(index, question, client=None):
