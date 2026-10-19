@@ -110,7 +110,11 @@ Models run on Vertex AI in the project `researchledger-2026` (`RL_GCP_PROJECT`).
 no model grades its own output. The quota project is set per process, so application-default credentials that
 point at another project are not changed.
 
-## On GCP (step 4, written; not yet applied)
+## On GCP (step 4)
+
+Status (19 Oct 2026): the infrastructure is applied in `researchledger-2026` (Terraform, 31 resources). The
+services run a placeholder image until the first run of the deploy workflow, and production stays on it until every
+gate passes.
 
 ```bash
 python -m researchledger embed --index .cache/index/marin.sqlite            # Vertex AI embeddings, for hybrid search

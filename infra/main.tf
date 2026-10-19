@@ -84,6 +84,7 @@ resource "google_bigquery_dataset" "marin" {
 resource "google_service_account" "runtime" {
   account_id   = "rl-runtime"
   display_name = "ResearchLedger service (Cloud Run)"
+  depends_on   = [google_project_service.apis]
 }
 
 resource "google_project_iam_member" "runtime" {
@@ -105,6 +106,7 @@ resource "google_bigquery_dataset_iam_member" "runtime_reads" {
 resource "google_service_account" "deployer" {
   account_id   = "rl-deployer"
   display_name = "ResearchLedger deploy pipeline (GitHub Actions)"
+  depends_on   = [google_project_service.apis]
 }
 
 resource "google_project_iam_member" "deployer" {
