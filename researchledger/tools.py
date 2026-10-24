@@ -14,6 +14,7 @@ from pathlib import Path
 from .retrieve import BM25Index  # noqa: F401 (re-exported for callers)
 
 MAX_TEXT = 600  # characters of chunk text returned by search
+MAX_TABLE_TEXT = 900  # the same for a chunk holding a table, whose rows are wide
 MAX_LINES = 40  # lines returned by one read_lines call
 MAX_ROWS = 200  # rows returned by one SQL query
 
@@ -22,22 +23,41 @@ _FORBIDDEN = re.compile(r"\b(insert|update|delete|drop|alter|create|replace|atta
                         re.IGNORECASE)
 
 
+_TABLE_SEP = re.compile(r"^\|[\s:|-]+\|?$")
+
+
+def _compact(text: str) -> str:
+    """A Markdown table row without its alignment padding ("|    63.2 |" -> "| 63.2 |"); other lines unchanged."""
+    if not text.lstrip().startswith("|"):
+        return text
+    return "| " + " | ".join(c.strip() for c in text.strip().strip("|").split("|")) + " |"
+
+
 def _fit(query: str, rows: list[tuple[int, str]], limit: int = MAX_TEXT) -> str:
     """Numbered lines of a chunk within `limit` characters. A long chunk keeps the lines that share the most terms
-    with the query (in file order, gaps marked), not just its first lines."""
+    with the query (in file order, gaps marked), not just its first lines. Table rows lose their padding and their
+    separator row, and a kept row brings its table's header row, so a value is never shown without its column."""
     from .retrieve import tokenize
 
+    rows = [(n, _compact(t)) for n, t in rows if not _TABLE_SEP.match(t.strip())]
     numbered = [f"{n}: {t}" for n, t in rows]
     if sum(len(x) + 1 for x in numbered) <= limit:
         return "\n".join(numbered)
+    is_row = [t.lstrip().startswith("|") for _, t in rows]
+    header = {}  # row index -> index of its table's header row (the first of a run of table rows)
+    for i, r in enumerate(is_row):
+        if r:
+            header[i] = header[i - 1] if i and is_row[i - 1] else i
     q = set(tokenize(query))
     ranked = sorted(range(len(rows)), key=lambda i: (-len(q & set(tokenize(rows[i][1]))), i))
     keep, used = set(), 0
     for i in ranked:
-        if used + len(numbered[i]) + 1 > limit and keep:
+        add = {i, header.get(i, i)} - keep
+        cost = sum(len(numbered[j]) + 1 for j in add)
+        if used + cost > limit and keep:
             continue
-        keep.add(i)
-        used += len(numbered[i]) + 1
+        keep |= add
+        used += cost
     out, prev = [], -1
     for i in sorted(keep):
         if prev >= 0 and i != prev + 1:
@@ -86,7 +106,8 @@ class LedgerIndex:
                 "lines": f"{h.start_line}-{h.end_line}",
                 "heading": h.heading,
                 "archived": h.path in self.archived,
-                "text": _fit(query, [(n, t) for n, t in rows if t.strip()]),
+                "text": _fit(query, kept := [(n, t) for n, t in rows if t.strip()],
+                             MAX_TABLE_TEXT if any(t.lstrip().startswith("|") for _, t in kept) else MAX_TEXT),
             })
         return out
 

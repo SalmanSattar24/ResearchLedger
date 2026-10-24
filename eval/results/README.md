@@ -114,3 +114,50 @@ capacity (provisioned throughput or a priority tier), a cost decision for step 4
 `eval/review/hand-check-answers-marin-20261018T045520.md` for the researcher to mark.
 
 **Judge cost** (not counted in the per-question gate): $0.57 in run 1 and $0.65 in run 3.
+
+## Answers after step 4 (hybrid retrieval, tool budgets, timeouts)
+
+The first staging deploy (`…20261019T085328`, [run 39222587267](https://github.com/SalmanSattar24/ResearchLedger/actions/runs/39222587267))
+graded the step 4 code on Cloud Run for the first time. It passed 5 of 12 gates, against 8 for run 3. That
+results file is a CI artifact and is not committed here. Two fixes and a retry change followed, each run locally.
+
+| Gate | Run 3 (local) | Staging (Cloud Run) | Run 4 (`…20261019T125216`, local) | Run 5 (`…20261023T043725`, local) | Required |
+|---|---|---|---|---|---|
+| Answer accuracy, overall | 24/38 | 22/38 | 26/38 | 25/38 | >= 31 |
+| lookup | 9/12 | 8/12 | 10/12 | 10/12 | >= 9 |
+| why | 4/8 | 4/8 | 5/8 | 4/8 | >= 6 |
+| superseded | 6/8 | 5/8 | 5/8 | 4/8 | >= 6 |
+| claim | 2/7 | 2/7 | 4/7 | 4/7 | >= 5 |
+| table (reported only) | 3/3 | 3/3 | 2/3 | 3/3 | no gate |
+| Citation support | 100/101 | 90/91 | 93/95 | 97/99 | >= 90% |
+| Citation recall | 36/38 | 37/38 | 34/38 | 36/38 | >= 33 |
+| Superseded handling | 6/8 | 5/8 | 5/8 | 4/8 | >= 6 |
+| Claim verdicts | 6/7 | 6/7 | 5/7 | 5/7 | >= 6 |
+| Safety | 3/3 | 3/3 | 3/3 | 3/3 | 3/3 |
+| Latency p95 | 52.3 s | 57.9 s | 79.9 s | 28.6 s | <= 20 s |
+| Cost per question (mean) | $0.0104 | $0.0073 | $0.0062 | $0.0078 | <= $0.02 |
+| Gates passed | 8 | 5 | 5 | 5 | 12 |
+
+**Why staging dropped from 8 to 5 gates.** Two items flipped (L09 lookup, S05 superseded), and run 3 sat exactly
+on the threshold for the three gates they count in. Retrieval was not the cause: hybrid search put the gold
+passages in the evidence pack, and citation recall rose. Two code faults were found:
+- **Evidence-pack trim.** Each passage is cut to 600 characters, keeping the lines that match the question. A
+  wide table fits only one row, so L09's pack showed OLMo's average (63.2) but not Marin Mantis's (65.2), and the
+  coordinator answered from the pack anyway. Now table rows drop their padding and separator row, a kept row
+  brings its header row, and a passage holding a table gets 900 characters.
+- **Tool budget.** The 3-call budget for retrieval_agent was counted per answer attempt, so a second delegation in
+  the same attempt started with the budget already used. It is now counted per delegation.
+
+Run 4 has both fixes. L09 and S06 are right in it, but S05 and T02 failed with Vertex `499 CANCELLED`, the
+status returned when a call passes its timeout. 499 was not in the retry list, so the question failed. **Run 5**
+adds 408, 499 and 502 to the retried statuses, and asks a question once more from scratch if its calls still fail
+transiently after the per-call retries. Run 5 had no API errors and needed no second try.
+
+**Still failing.** Run 5 still passes 5 gates. Its superseded misses (S01, S03, S05, S08) are completeness misses:
+the answer names the change but leaves out the step it happened at or the reason (S05 says Bison was abandoned,
+not that it was for GSM8k contamination and a shuffle phase shift). The superseded, why and claim gates each
+miss by one or two items, so they move with run-to-run variation: three local reruns of L09, S02, S05 and S06 on
+the staging code gave 1/3, 2/3, 0/3 and 3/3 correct. Prompt changes aimed at these items would overfit the set.
+
+**Latency** varies with shared Gemini capacity as much as with the code: the same code gave p95 79.9 s in run 4
+and 28.6 s in run 5. **Judge cost:** $0.62 in run 4 and $0.64 in run 5.

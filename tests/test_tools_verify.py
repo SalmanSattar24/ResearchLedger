@@ -104,3 +104,18 @@ def test_parse_answer_tolerates_fences_and_nulls():
     assert (a.status, a.answer, a.claims, a.reason) == ("refused", "", [], "")
     with pytest.raises(ValueError):
         parse_answer("no json here")
+
+
+def test_fit_keeps_a_table_rows_header_and_drops_padding():
+    from researchledger.tools import _fit
+
+    cols = " | ".join(f"Task {i:02d}" for i in range(12))
+    rows = [(1, "## Results"), (2, "Prose about the suite " + "x" * 200),
+            (3, f"| Model | Average | {cols} |"), (4, "| :--- | ---: |" + " ---: |" * 12)]
+    rows += [(5 + i, f"| **Model {name}**    |    {avg} |" + " 1.0 |" * 12)
+             for i, (name, avg) in enumerate([("Alpha", "61.0"), ("Bison", "63.0"), ("Mantis", "65.2"), ("Olmo", "63.2")])]
+    out = _fit("How does Mantis compare with Olmo?", rows, limit=600)
+    assert "3: | Model | Average |" in out  # the header comes with its rows
+    assert "65.2" in out and "63.2" in out
+    assert "---:" not in out and "|    " not in out
+    assert "Alpha" not in out  # rows that do not match the query are still trimmed
