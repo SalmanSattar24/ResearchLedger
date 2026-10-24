@@ -141,14 +141,15 @@ def _build(index: LedgerIndex, usage: Usage, ran_sql: list[str]):
 
     def cfg(agent: str):
         return types.GenerateContentConfig(temperature=0, thinking_config=types.ThinkingConfig(thinking_level="low"),
-                                           http_options=types.HttpOptions(timeout=CALL_TIMEOUT_MS[agent]))
+                                           http_options=types.HttpOptions(timeout=CALL_TIMEOUT_MS[agent], retry_options=RETRY))
 
     def budget(tool, args, tool_context):
-        """Stop a sub-agent's ReAct loop after TOOL_BUDGET calls per attempt (a returned dict replaces the tool's
-        result)."""
+        """Stop a sub-agent's ReAct loop after TOOL_BUDGET calls per delegation (a returned dict replaces the tool's
+        result). Each delegation is its own invocation, so a second delegation starts with a fresh budget."""
         agent = tool_context.agent_name
-        usage.tool_calls[agent] = usage.tool_calls.get(agent, 0) + 1
-        if usage.tool_calls[agent] > TOOL_BUDGET.get(agent, 99):
+        key = f"{agent}:{tool_context.invocation_id}"
+        usage.tool_calls[key] = usage.tool_calls.get(key, 0) + 1
+        if usage.tool_calls[key] > TOOL_BUDGET.get(agent, 99):
             return {"error": "tool budget used up: reply now with the findings you have"}
         return None
 
@@ -165,7 +166,29 @@ def _build(index: LedgerIndex, usage: Usage, ran_sql: list[str]):
                     generate_content_config=cfg("coordinator"), **common)
 
 
+QUESTION_TRIES = 2  # a question whose model calls still fail transiently after RETRY is asked once more, from scratch
+
+
 async def _ask_async(index: LedgerIndex, question: str, client) -> Result:
+    """Answer one question. A transient failure (Vertex 499 CANCELLED, a timeout, a 5xx) that outlasts the per-call
+    retries starts the question again rather than failing it; the time lost still counts toward its latency."""
+    from .llm import is_transient
+
+    t0 = time.perf_counter()
+    for i in range(1, QUESTION_TRIES + 1):
+        try:
+            r = await _ask_once(index, question, client)
+        except Exception as e:
+            if i == QUESTION_TRIES or not is_transient(e):
+                raise
+            continue
+        r.seconds = round(time.perf_counter() - t0, 2)
+        if i > 1:
+            r.usage["question_tries"] = i
+        return r
+
+
+async def _ask_once(index: LedgerIndex, question: str, client) -> Result:
     from google.adk.runners import InMemoryRunner
     from google.genai import types
 
