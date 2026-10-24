@@ -1,5 +1,7 @@
 # ResearchLedger
 
+> **For employers:** [start with the five-minute technical guide](docs/EMPLOYER_GUIDE.md). It separates implemented components, measured limitations and cloud/deployment plans.
+
 An evidence-checked assistant for research repositories. It answers questions over a project's record (research
 log, deviations log, protocol, notebooks, result tables) with citations to the exact file, line and commit, keeps
 track of facts that were later superseded, and checks whether a claim (in a CV, abstract or draft) is backed by the
