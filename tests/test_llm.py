@@ -70,3 +70,38 @@ def test_a_question_is_asked_again_after_a_transient_failure(monkeypatch):
     monkeypatch.setattr(agents, "_ask_once", bad)
     with pytest.raises(errors.ClientError):  # not transient: fails at once, as before
         asyncio.run(agents._ask_async(None, "q", None))
+
+
+def test_a_question_abstains_at_its_deadline(monkeypatch):
+    import asyncio
+
+    from researchledger import agents
+
+    async def hang(index, question, client):  # model calls that keep retrying past the deadline
+        await asyncio.sleep(10)
+
+    monkeypatch.setattr(agents, "_ask_once", hang)
+    r = asyncio.run(agents._ask_async(None, "q", None, deadline_s=0.2))
+    assert r.answer.status == "abstained" and r.answer.reason.startswith("time limit")
+    assert r.attempts == 0 and r.usage["deadline_hit"] and r.seconds < 2
+
+
+def test_no_second_try_without_time_for_it(monkeypatch):
+    import asyncio
+
+    import pytest
+    from google.genai import errors
+
+    from researchledger import agents
+
+    calls = []
+
+    async def fail(index, question, client):
+        calls.append(1)
+        raise errors.ServerError(504, {"error": {"code": 504, "status": "DEADLINE_EXCEEDED"}})
+
+    monkeypatch.setattr(agents, "_ask_once", fail)
+    monkeypatch.setattr(agents, "MIN_TRY_S", 60.0)
+    with pytest.raises(errors.ServerError):  # 10 s left is less than MIN_TRY_S: fail now, not mid-retry later
+        asyncio.run(agents._ask_async(None, "q", None, deadline_s=10))
+    assert len(calls) == 1
