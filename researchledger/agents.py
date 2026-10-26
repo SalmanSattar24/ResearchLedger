@@ -167,19 +167,34 @@ def _build(index: LedgerIndex, usage: Usage, ran_sql: list[str]):
 
 
 QUESTION_TRIES = 2  # a question whose model calls still fail transiently after RETRY is asked once more, from scratch
+# Wall-clock limit for one question, retries included. Cloud Run ends a request at 300 s (infra/main.tf) and the
+# eval client waits 300 s, so stop well before and answer "abstained" instead of letting the request be cut off.
+QUESTION_DEADLINE_S = 240.0
+MIN_TRY_S = 60.0  # a second try starts only if at least this much of the deadline is left
 
 
-async def _ask_async(index: LedgerIndex, question: str, client) -> Result:
+async def _ask_async(index: LedgerIndex, question: str, client, deadline_s: float | None = None) -> Result:
     """Answer one question. A transient failure (Vertex 499 CANCELLED, a timeout, a 5xx) that outlasts the per-call
-    retries starts the question again rather than failing it; the time lost still counts toward its latency."""
+    retries starts the question again rather than failing it; the time lost still counts toward its latency.
+
+    Everything, per-call retries and backoff waits included, runs within QUESTION_DEADLINE_S. Past it the question
+    abstains with the reason "time limit"; usage of the cancelled try is not recorded."""
     from .llm import is_transient
 
+    deadline_s = QUESTION_DEADLINE_S if deadline_s is None else deadline_s
     t0 = time.perf_counter()
     for i in range(1, QUESTION_TRIES + 1):
+        left = deadline_s - (time.perf_counter() - t0)
         try:
-            r = await _ask_once(index, question, client)
+            r = await asyncio.wait_for(_ask_once(index, question, client), timeout=left)
+        except asyncio.TimeoutError:
+            seconds = round(time.perf_counter() - t0, 2)
+            return Result(question, Answer(status="abstained", reason=f"time limit: no verified answer in {seconds} s"),
+                          0, [f"question deadline of {deadline_s:g} s reached"], seconds,
+                          {"cost_usd": 0.0, "question_tries": i, "deadline_hit": True}, [])
         except Exception as e:
-            if i == QUESTION_TRIES or not is_transient(e):
+            left = deadline_s - (time.perf_counter() - t0)
+            if i == QUESTION_TRIES or not is_transient(e) or left < MIN_TRY_S:
                 raise
             continue
         r.seconds = round(time.perf_counter() - t0, 2)
