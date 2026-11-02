@@ -8,6 +8,7 @@ eval/results/*.tmp
 *.tfstate*
 .cache/
 .pytest_cache/
+demo/data/
 *.egg-info/
 
 # Terraform: state and real variable values stay local
