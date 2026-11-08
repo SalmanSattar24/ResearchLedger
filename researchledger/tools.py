@@ -71,10 +71,14 @@ def _fit(query: str, rows: list[tuple[int, str]], limit: int = MAX_TEXT) -> str:
 
 class LedgerIndex:
     def __init__(self, index_path: str | Path, retriever: str | None = None, embed=None, sql_backend: str | None = None):
-        from .embed import open_retriever
-
         self.path = Path(index_path)
-        self.retriever = open_retriever(self.path, retriever, embed)
+        # Explicit keyword-only clients (including the zero-API-cost demo) must
+        # not import the hybrid retrieval path or initialize an embedding provider.
+        if retriever == "bm25":
+            self.retriever = BM25Index(self.path)
+        else:
+            from .embed import open_retriever
+            self.retriever = open_retriever(self.path, retriever, embed)
         self.db = sqlite3.connect(f"file:{self.path.as_posix()}?mode=ro", uri=True, check_same_thread=False)
         self.db.execute("PRAGMA query_only = ON")
         self.archived = {p for (p,) in self.db.execute("SELECT path FROM documents WHERE archived = 1")}

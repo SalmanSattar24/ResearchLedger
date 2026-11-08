@@ -2,6 +2,8 @@
 
 > **For employers:** [start with the five-minute technical guide](docs/EMPLOYER_GUIDE.md). It separates implemented components, measured limitations and cloud/deployment plans.
 
+**Public corpus Evidence Explorer:** [try it live on Replit](https://evidence-explorer-demo--salmansattar.replit.app/) or [run the small demo](demo/README.md) to inspect real Marin source retrieval, pinned citations and deterministic checks without an API key. Optional Gemini Developer API generation adds a separate support-check step and persistent request caps. This demo is separate from the ADK/cloud service and does not change its recorded evaluation results.
+
 An evidence-checked assistant for research repositories. It answers questions over a project's record (research
 log, deviations log, protocol, notebooks, result tables) with citations to the exact file, line and commit, keeps
 track of facts that were later superseded, and checks whether a claim (in a CV, abstract or draft) is backed by the
